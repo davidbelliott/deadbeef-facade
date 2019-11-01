@@ -444,7 +444,7 @@ int main(int argc, char* argv[])
         game_init();
 
 
-        int game_state = GAME_STATE_INTRO;
+        int game_state = GAME_STATE_GAME;
         int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;
