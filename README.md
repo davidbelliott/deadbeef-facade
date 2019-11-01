@@ -4,6 +4,36 @@
 
 After graduating from Cal Tech, you land a sweet gig as a janitor. Your boss, Ape Man, gives you the task of cleaning up the basement of the company building. To your dismay, the basement is infested by hordes of rats. With only your Zune to keep you company, you must slaughter the rats to the beat of your big chunes, your foray into the depths mirroring your slow descent into madness in a cinematic slow-burn that's sure to bring plenty of zany laughs for the whole family.
 
+## Dependencies and Build
+
+After cloning the repository, run
+
+```
+git submodule init
+git submodule update
+cd whitgl
+```
+
+Run the `get_inputs` script corresponding to your operating system. For example, for Linux type
+
+```
+./scripts/linux/get_inputs.sh
+```
+
+For MacOS, type
+
+```
+./scripts/osx/get_inputs.sh
+```
+
+Finally,
+
+```
+cd ..
+./setup.sh
+make
+```
+
 ## Specification
 
 ### World
