@@ -18,6 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int tile_tex_offset[N_TILE_TYPES][2] = {
+    {0, 0},
+    {0, 0},
+    {256, 0},
+    {320, 0}
+};
 
 static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
 {
@@ -37,13 +43,13 @@ static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
 	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
 	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
 	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,0,0,0,0,5,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,0,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,0,3,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,0,0,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,0,3,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+	{1,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
 };
 
@@ -131,7 +137,6 @@ note_pop_text_t note_pop_text = { 0 };
 anim_obj *anim_objs[MAX_N_ANIM_OBJS] = {0};
 
 physics_obj* phys_objs[MAX_N_PHYS] = {0};
-unsigned int n_phys_objs = 0;
 
 player_t* player = NULL;
 
@@ -267,13 +272,17 @@ void destr_loops() {
 
 static physics_obj* phys_create(point2 *pos, vector2 *vel, double radius) {
     physics_obj *ptr = NULL;
-    if(n_phys_objs < MAX_N_PHYS) {
-        ptr = (physics_obj*)malloc(sizeof(physics_obj));
-        ptr->id = n_phys_objs++;
-        ptr->pos = *pos;
-        ptr->vel = *vel;
-        ptr->radius = radius;
-        phys_objs[ptr->id] = ptr;
+    for (int i = 0; i < MAX_N_PHYS; i++) {
+        if (!phys_objs[i]) {
+            printf("Putting in index %d\n", i);
+            ptr = (physics_obj*)malloc(sizeof(physics_obj));
+            ptr->id = i;
+            ptr->pos = *pos;
+            ptr->vel = *vel;
+            ptr->radius = radius;
+            phys_objs[ptr->id] = ptr;
+            break;
+        }
     }
     return ptr;
 }
@@ -295,6 +304,7 @@ static void player_create(point2 *pos, double angle) {
     player = (player_t*)malloc(sizeof(player_t));
     vector2 zero = {0.0, 0.0};
     player->phys = phys_create(pos, &zero, 0.2);
+    assert(player->phys);
     player->angle = angle;
     player->look_direction = zero;
     player->move_direction = zero;
@@ -311,6 +321,7 @@ static rat_t* rat_create(point2 *pos) {
             rat->id = i;
             vector2 vel = {0.0, 0.0};
             rat->phys = phys_create(pos, &vel, 0.3);
+            assert(rat->phys);
             whitgl_sprite rat_sprite = {0, {128,0}, {64,64}};
             whitgl_ivec frametr = {0, 0};
             int n_frames[MAX_N_ANIM_STATES] = {2};
@@ -336,6 +347,9 @@ void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
 }
 
 static void rat_destroy(rat_t *rat) {
+    if (player->targeted_rat == rat->id) {
+        player->targeted_rat = -1;
+    }
     phys_destroy(rat->phys);
     rat->phys = NULL;
     rats[rat->id] = NULL;
@@ -365,12 +379,12 @@ static bool try_to_move(physics_obj *obj, struct point2 *pos)
 				return false;
 		}
 	}
-        /*for (int i = 0; i < n_phys_objs; i++) {
-            if(i != obj->id && pow(phys_objs[i]->pos.x - pos->x, 2) + pow(phys_objs[i]->pos.y - pos->y, 2)
+        for (int i = 0; i < MAX_N_PHYS; i++) {
+            if(phys_objs[i] && i != obj->id && pow(phys_objs[i]->pos.x - pos->x, 2) + pow(phys_objs[i]->pos.y - pos->y, 2)
                     < pow(phys_objs[i]->radius + obj->radius, 2)) {
                 return false;
             }
-        }*/
+        }
 	return true;
 }
 
@@ -419,9 +433,6 @@ static double degrees_to_radians(double angle) {
 static bool eq(ipoint2 p1, ipoint2 p2) {
     return p1.x == p2.x && p1.y == p2.y;
 }
-
-typedef void (*draw_wall_fn)(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp);
-
 
 // The VBO containing the 4 vertices of the particles.
 static struct point2 square_mesh[] = {
@@ -618,8 +629,8 @@ static void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp
     whitgl_sys_draw_model(2, WHITGL_SHADER_EXTRA_1, model_matrix, view, persp);
 }
     
-static void draw_wall(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
-    whitgl_fvec wall_offset = {0, 0};
+static void draw_wall(int type, whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
+    whitgl_fvec wall_offset = {tile_tex_offset[type][0], tile_tex_offset[type][1]};
     whitgl_fvec wall_size = {64, 64};
     whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 2, wall_offset);
     whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 3, wall_size);
@@ -683,16 +694,14 @@ static void draw_overlay(int cur_loop, int cur_note) {
 static void draw_notes(note_t *beat, int cur_note, float time_since_note, int x) {
     int total_notes = NOTES_PER_MEASURE * MEASURES_PER_LOOP;
     int earliest_idx = NOTES_PER_MEASURE / 2;
-    int latest_idx = MAX(-NOTES_PER_MEASURE / 8, earliest_active_note_offset);
+    int latest_idx = -NOTES_PER_MEASURE / 8;
     for (int i = latest_idx; i < earliest_idx; i++) {
         int note_idx = _mod(cur_note + i, total_notes);
         note_t *note = &beat[note_idx];
-        if (note->exists) {
-            if (!note->popped) {
-                whitgl_ivec pos = get_note_pos(note->channel, i, earliest_idx, latest_idx);
-                pos.x = x;
-                note->pos = pos;
-            }
+        if (note->exists && !note->popped) {
+            whitgl_ivec pos = get_note_pos(note->channel, i, earliest_idx, latest_idx);
+            pos.x = x;
+            note->pos = pos;
             anim_obj *anim = note->anim;
             //whitgl_sys_draw_sprite(anim->sprite, anim->frametr, note->pos);
             whitgl_iaabb note_iaabb = {note->pos, {note->pos.x + 16, note->pos.y + 16}};
@@ -781,18 +790,18 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
 }
 
 static void draw_note_pop_text() {
-        if (note_pop_text.exists) {
-            int str_len = strlen("BASED");
-            int x = note_pop_pos.x - str_len * FONT_CHAR_W;
-            int y = note_pop_pos.y + 8 + 20.0f * (note_pop_text.life);
-            whitgl_iaabb iaabb = {{x, y - 12}, {x + str_len * 6, y}};
-            whitgl_sys_color col = {0, 0, 0, 255};
-            whitgl_sys_draw_iaabb(iaabb, col);
+    if (note_pop_text.exists) {
+        int str_len = strlen("BASED");
+        int x = note_pop_pos.x - str_len * FONT_CHAR_W;
+        int y = note_pop_pos.y + 8 + 20.0f * (note_pop_text.life);
+        whitgl_iaabb iaabb = {{x, y - 12}, {x + str_len * 6, y}};
+        whitgl_sys_color col = {0, 0, 0, 255};
+        whitgl_sys_draw_iaabb(iaabb, col);
 
-            whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-            whitgl_ivec text_pos = { x, y - 12};
-            whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
-        }
+        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
+        whitgl_ivec text_pos = { x, y - 12};
+        whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
+    }
 }
             
 
@@ -820,7 +829,7 @@ static void draw_floors(struct point2 *player_pos, whitgl_fmat view, whitgl_fmat
     }
 }
 
-static void raycast(struct point2 *position, double angle, draw_wall_fn draw_wall, whitgl_fmat view, whitgl_fmat persp)
+static void raycast(struct point2 *position, double angle, whitgl_fmat view, whitgl_fmat persp)
 {
     int n_drawn = 0;
     double fov = whitgl_pi / 2 * (double)SCREEN_W/(double)SCREEN_H;
@@ -891,7 +900,7 @@ static void raycast(struct point2 *position, double angle, draw_wall_fn draw_wal
         }
         if (draw && !drawn[x][y]) {
             whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(pos, view, persp);
+            draw_wall(map[x][y], pos, view, persp);
             drawn[x][y] = 1;
             n_drawn++;
         }
@@ -920,7 +929,7 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     whitgl_fvec3 skybox_pos = camera_pos;
     skybox_pos.z = -2.5f;
     //draw_skybox(skybox_pos, view, perspective);
-    raycast(&player->phys->pos, p->angle, draw_wall, view, perspective);
+    raycast(&player->phys->pos, p->angle, view, perspective);
     draw_floors(&player->phys->pos, view, perspective);
     draw_rats(view, perspective);
 
@@ -929,7 +938,7 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     draw_rat_overlays(player->targeted_rat, cur_note, time_since_note, view, perspective);
 
     //draw_notes(cur_loop, cur_note, time_since_note);
-    //draw_note_pop_text();
+    draw_note_pop_text();
     draw_overlay(cur_loop, cur_note);
 
     whitgl_sys_draw_finish();
@@ -1047,7 +1056,7 @@ void rats_prune() {
 }
 
 static void phys_update(float dt) {
-    for(int i = 0; i < n_phys_objs; i++) {
+    for(int i = 0; i < MAX_N_PHYS; i++) {
         if (phys_objs[i]) {
             phys_obj_update(phys_objs[i], dt);
         }
@@ -1164,78 +1173,60 @@ static int get_closest_targeted_rat(point2 player_pos, vector2 player_look) {
 
 void game_pause(bool paused) {
     whitgl_loop_set_paused(AMBIENT_MUSIC, paused);
-    whitgl_loop_set_paused(0, paused);
 }
 
 void game_input()
 {
-        player_t *p = player;
+    player_t *p = player;
 
-        vector2 move_dir = {0.0, 0.0};
-        if(whitgl_input_held(WHITGL_INPUT_UP))
-            move_dir.x += 1.0;
-        if(whitgl_input_held(WHITGL_INPUT_DOWN))
-            move_dir.x -= 1.0;
-        if(whitgl_input_held(WHITGL_INPUT_RIGHT))
-            move_dir.y -= 1.0;
-        if(whitgl_input_held(WHITGL_INPUT_LEFT))
-            move_dir.y += 1.0;
-        player->move_direction = move_dir;
+    vector2 move_dir = {0.0, 0.0};
+    if(whitgl_input_held(WHITGL_INPUT_UP))
+        move_dir.x += 1.0;
+    if(whitgl_input_held(WHITGL_INPUT_DOWN))
+        move_dir.x -= 1.0;
+    if(whitgl_input_held(WHITGL_INPUT_RIGHT))
+        move_dir.y -= 1.0;
+    if(whitgl_input_held(WHITGL_INPUT_LEFT))
+        move_dir.y += 1.0;
+    player->move_direction = move_dir;
 
-        if (whitgl_input_pressed(WHITGL_INPUT_A)) {
-            player->targeted_rat = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
-        }
-
-        /*if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_SCROLL_UP)) {
-            change_cur_loop(MIN(cur_loop + 1, NUM_LOOPS - 1), cur_note, time_since_note);
-            WHITGL_LOG("scroll up: %d", cur_loop);
-        }
-
-        if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_SCROLL_DOWN)) {
-            change_cur_loop(MAX(cur_loop - 1, 0), cur_note, time_since_note);
-            WHITGL_LOG("scroll down: %d", cur_loop);
-        }
-
-        if (whitgl_input_pressed(WHITGL_INPUT_A)) {
-            cur_loop_toggle_active(cur_note, time_since_note);
-        }*/
-        
-        /*if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT) ||
-            whitgl_input_pressed(WHITGL_INPUT_MOUSE_RIGHT)) {
-            if (loop_active) {
-                int best_candidate = NOTES_PER_MEASURE/8+1;
-                int best_idx = -1;
-                for (int i = MAX(earliest_active_note_offset, -NOTES_PER_MEASURE/8); i < NOTES_PER_MEASURE/8; i++) {
-                    int note_idx = _mod(cur_note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
-                    if (aloops[cur_loop].notes[note_idx].exists && !aloops[cur_loop].notes[note_idx].popped && abs(i) < best_candidate) {
-                        best_idx = note_idx;
-                        best_candidate = abs(i);
-                    }
-                }
-                if (best_idx != -1) {
-                    float acc = 1.0f - (float)best_candidate / (float)(NOTES_PER_MEASURE / 8);
-                    aloops[cur_loop].notes[best_idx].popped = true;
-                    aloops[cur_loop].notes[best_idx].anim->frametr.x = 0;
-                    aloops[cur_loop].notes[best_idx].anim->frametr.y = 1;
-                    if (acc <= 0.25f) {
-                        set_note_pop_text("BAD");
-                    } else if (acc <= 0.50f) {
-                        set_note_pop_text("OK");
-                    } else if (acc <= 0.75f) {
-                        set_note_pop_text("GOOD");
-                    } else {
-                        set_note_pop_text("BASED");
-                    }
-                    int closest_hit_rat = get_closest_targeted_rat(player->phys->pos, player->look_direction);
-                    if (closest_hit_rat != -1) {
-                        rat_deal_damage(rats[closest_hit_rat], (int)(4.0f * acc));
-                    }
+    if (whitgl_input_pressed(WHITGL_INPUT_A)) {
+        player->targeted_rat = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
+    }
+    
+    if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT)) {
+        if (p->targeted_rat != -1) {
+            int best_candidate = NOTES_PER_MEASURE/8+1;
+            int best_idx = -1;
+            note_t *beat = rats[p->targeted_rat]->beat;
+            for (int i = -NOTES_PER_MEASURE/8; i < NOTES_PER_MEASURE/8; i++) {
+                int note_idx = _mod(cur_note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
+                if (beat[note_idx].exists && !beat[note_idx].popped && abs(i) < best_candidate) {
+                    best_idx = note_idx;
+                    best_candidate = abs(i);
                 }
             }
-        }*/
+            if (best_idx != -1) {
+                float acc = 1.0f - (float)best_candidate / (float)(NOTES_PER_MEASURE / 8);
+                beat[best_idx].popped = true;
+                //beat[best_idx].anim->frametr.x = 0;
+                //beat[best_idx].anim->frametr.y = 1;
+                if (acc <= 0.25f) {
+                    set_note_pop_text("BAD");
+                } else if (acc <= 0.50f) {
+                    set_note_pop_text("OK");
+                } else if (acc <= 0.75f) {
+                    set_note_pop_text("GOOD");
+                } else {
+                    set_note_pop_text("BASED");
+                }
+                rat_deal_damage(rats[p->targeted_rat], (int)(4.0f * acc));
+            }
+        }
+    }
 
-        whitgl_ivec mouse_pos = whitgl_input_mouse_pos(PIXEL_DIM);
-        p->angle = mouse_pos.x * MOUSE_SENSITIVITY / (double)(SCREEN_W);
+    whitgl_ivec mouse_pos = whitgl_input_mouse_pos(PIXEL_DIM);
+    p->angle = mouse_pos.x * MOUSE_SENSITIVITY / (double)(SCREEN_W);
 }
 
 void game_init() {

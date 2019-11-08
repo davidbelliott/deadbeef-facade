@@ -439,12 +439,12 @@ int main(int argc, char* argv[])
         whitgl_loop_add(AMBIENT_MUSIC, "data/snd/ambient.ogg");
 
 
-	whitgl_sound_add(0, "data/snd/tick.ogg");
+	//whitgl_sound_add(0, "data/snd/tick.ogg");
 
         game_init();
 
 
-        int game_state = GAME_STATE_GAME;
+        int game_state = GAME_STATE_INTRO;
         int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;

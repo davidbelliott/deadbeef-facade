@@ -47,6 +47,8 @@ enum {
 
 #define SHORT_TEXT_MAX_LEN 256
 
+#define N_TILE_TYPES 4
+
 
 typedef struct point2 {
 	double x;
