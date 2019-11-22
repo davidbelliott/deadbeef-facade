@@ -18,6 +18,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int tile_lvl_rgb[N_TILE_TYPES][4] = {
+    {0, 0, 0},
+    {0, 0, 127},
+    {127, 0, 0},
+    {0, 0, 255}
+};
+
 static int tile_tex_offset[N_TILE_TYPES][2] = {
     {0, 0},
     {0, 0},
@@ -25,7 +32,7 @@ static int tile_tex_offset[N_TILE_TYPES][2] = {
     {320, 0}
 };
 
-static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
+/*static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
 {
 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
 	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
@@ -51,9 +58,17 @@ static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
 	{1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
 	{1,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
 	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
-};
+};*/
+
+
 
 static unsigned int drawn[MAP_WIDTH][MAP_HEIGHT] = {{ 0 }};
+
+typedef struct map_t {
+    unsigned char *data;
+    int w;
+    int h;
+} map_t;
 
 typedef struct physics_obj {
     unsigned int id;
@@ -126,7 +141,6 @@ typedef struct loop_t {
     note_t notes[TOTAL_NUM_NOTES];
 } loop_t;
 
-loop_t aloops[NUM_LOOPS] = {{{ 0 }}};
 int earliest_active_note_offset = 0;
 int cur_loop = 0;
 int cur_note = 0;
@@ -142,7 +156,7 @@ player_t* player = NULL;
 
 rat_t* rats[MAX_N_RATS] = {0};
 
-
+map_t map = {0};
 
 int cycles_to_astar = 0;
 int actual_song_millis = 0;
@@ -154,6 +168,10 @@ whitgl_float song_len = 0.0f;
 
 // Definitions of static helper functions
 static int get_closest_targeted_rat(point2 player_pos, vector2 player_look);
+
+static unsigned char map_get(map_t *map, int x, int y) {
+    return map->data[y * map->h + x];
+}
 
 static anim_obj *anim_create(whitgl_sprite sprite, whitgl_ivec frametr, int n_frames[MAX_N_ANIM_STATES], int delay, bool loop) {
     int i = 0;
@@ -237,39 +255,6 @@ static void note_create(note_t *note, int exists) {
     }
 }
 
-void load_loops(char *file) {
-    for (int i = 0; i < NUM_LOOPS; i++) {
-        for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
-            if (!(j % (96/(4*(i + 1))))) {// && !(rand() % 2)) {
-                whitgl_sprite note_sprite = {0, {128,64},{16,16}};
-                whitgl_ivec frametr = {0, 0};
-                int n_frames[MAX_N_ANIM_STATES] = {1, 4};
-                anim_obj *anim = anim_create(note_sprite, frametr, n_frames, NOTES_PER_MEASURE / 16, false);
-                note_t note = {true, 0, false, false, 0, 0, rand() % 4, anim};
-                aloops[i].notes[j] = note;
-            } else {
-                aloops[i].notes[j].exists = false;
-            }
-        }
-    }
-    int i = 0;
-    strcpy(aloops[i++].name, "Big Chune 1");
-    strcpy(aloops[i++].name, "Dragon Tor");
-    strcpy(aloops[i++].name, "Amen");
-    strcpy(aloops[i++].name, "Fashy Chune");
-}
-
-void destr_loops() {
-    for (int i = 0; i < NUM_LOOPS; i++) {
-        for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
-            if (aloops[i].notes[j].exists) {
-                anim_destroy(aloops[i].notes[j].anim);
-            }
-            aloops[i].notes[j].exists = false;
-        }
-    }
-}
-
 static physics_obj* phys_create(point2 *pos, vector2 *vel, double radius) {
     physics_obj *ptr = NULL;
     for (int i = 0; i < MAX_N_PHYS; i++) {
@@ -327,7 +312,7 @@ static rat_t* rat_create(point2 *pos) {
             int n_frames[MAX_N_ANIM_STATES] = {2};
             rat->anim = anim_create(rat_sprite, frametr, n_frames, NOTES_PER_MEASURE / 4, true);
             rat->path = NULL;
-            rat->health = 10;
+            rat->health = 50;
             rat->dead = false;
 
             for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
@@ -375,7 +360,7 @@ static bool try_to_move(physics_obj *obj, struct point2 *pos)
 
 	for (int x = x0; x <= x1; x++) {
 		for (int y = y0; y <= y1; y++) {
-			if (map[x][y])
+			if (map_get(&map, x, y))
 				return false;
 		}
 	}
@@ -560,7 +545,7 @@ list_t* astar(ipoint2 start, ipoint2 end) {
     list_t *closed = NULL;
     push_front(&open, astar_alloc_node(start.x, start.y, NULL));
 
-    while(open) {
+    for (int n_iters = 0; n_iters < 1024 && open; n_iters++) {
         astar_node_t *q = (astar_node_t*)pop_front(&open);
         astar_insert_sort_f(&closed, q);
         list_t *s = NULL;
@@ -578,8 +563,8 @@ list_t* astar(ipoint2 start, ipoint2 end) {
                 int dy = offsets[j];
                 if(     (dx != 0 || dy != 0) // not both zero
                         && x+dx < MAP_WIDTH && x+dx >= 0 && y+dy < MAP_HEIGHT && y+dy >= 0 // within bounds
-                        && map[x+dx][y+dy] == 0 // no wall in target spot
-                        && (dx == 0 || dy == 0 || (map[x][y+dy] == 0 && map[x+dx][y] == 0))) // valid if diagonal
+                        && map_get(&map, x+dx, y+dy) == 0 // no wall in target spot
+                        && (dx == 0 || dy == 0 || (map_get(&map, x, y+dy) == 0 && map_get(&map, x+dx, y) == 0))) // valid if diagonal
                 {
                     /*if(q->pt.x == 9 && q->pt.y == 5)
                         printf("Found neighbor: (%d, %d)\n", x+dx, y+dy);*/
@@ -610,13 +595,10 @@ list_t* astar(ipoint2 start, ipoint2 end) {
         }
         astar_free_node_list(&s);
     }
-    //pathfinding failed; return a path to the closest point
-    list_t *q = pop_front(&closed);
-    list_t *path = reconstruct_path(q->data);
-    free(q);
+    //pathfinding failed
     astar_free_node_list(&open);
     astar_free_node_list(&closed);
-    return path;
+    return NULL;
 }
 
 static void draw_skybox(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
@@ -821,7 +803,7 @@ static void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
 static void draw_floors(struct point2 *player_pos, whitgl_fmat view, whitgl_fmat persp) {
     for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
         for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
-            if (map[x][y] == 0) {
+            if (map_get(&map, x, y) == 0) {
                 whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 1.0f};
                 draw_floor(pos, view, persp);
             }
@@ -881,7 +863,7 @@ static void raycast(struct point2 *position, double angle, whitgl_fmat view, whi
 
         bool draw = false;
         for (;;) {
-            if (map[x][y] != 0) {
+            if (map_get(&map, x, y) != 0) {
                 draw = true;
                 break;
             }
@@ -900,7 +882,7 @@ static void raycast(struct point2 *position, double angle, whitgl_fmat view, whi
         }
         if (draw && !drawn[x][y]) {
             whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(map[x][y], pos, view, persp);
+            draw_wall(map_get(&map, x, y), pos, view, persp);
             drawn[x][y] = 1;
             n_drawn++;
         }
@@ -1001,7 +983,7 @@ bool line_of_sight_exists(point2 *p1, point2 *p2) {
             dy = INFINITY;
 
     while(x != (int)p2->x || y != (int)p2->y) {
-            if (map[x][y] != 0) {
+            if (map_get(&map, x, y) != 0) {
                 return false;
             }
 
@@ -1125,8 +1107,10 @@ static void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool 
                 ipoint2 start = {(int)(rats[i]->phys->pos.x), (int)(rats[i]->phys->pos.y)};
                 ipoint2 end = {(int)(p->phys->pos.x), (int)(p->phys->pos.y)};
                 rats[i]->path = astar(start, end);
-                astar_node_t *start_node = pop_front(&rats[i]->path);
-                free(start_node);
+                if (rats[i]->path) {
+                    astar_node_t *start_node = pop_front(&rats[i]->path);
+                    free(start_node);
+                }
             }
             if(!line_of_sight && rats[i]->path) {
                 astar_node_t *next_node = (astar_node_t*)rats[i]->path->data;
@@ -1169,6 +1153,40 @@ static int get_closest_targeted_rat(point2 player_pos, vector2 player_look) {
         }
     }
     return closest_hit_rat;
+}
+
+void game_load_level(char *levelname, map_t *map) {
+    unsigned char *data;
+    whitgl_int w = 0, h = 0;
+    bool ret = whitgl_sys_load_png(levelname, &w, &h, &data);
+    if (!ret) {
+        map->data = NULL;
+        return;
+    }
+
+    map->w = (int)w;
+    map->h = (int)h;
+    map->data = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
+    memset(map->data, 0, sizeof(unsigned char) * w * h);
+
+    int data_idx, tile;
+    for (int i = 0; i < w * h; i++) {
+        data_idx = 4 * i;
+        tile = 0;
+        for (int j = 0; j < N_TILE_TYPES; j++) {
+            if (tile_lvl_rgb[j][0] == data[data_idx]
+                    && tile_lvl_rgb[j][1] == data[data_idx + 1]
+                    && tile_lvl_rgb[j][2] == data[data_idx + 2]) {
+                tile = j;
+                break;
+            }
+        }
+        map->data[i] = tile;
+    }
+}
+
+void game_free_level(map_t *map) {
+    free(map->data);
 }
 
 void game_pause(bool paused) {
@@ -1230,18 +1248,18 @@ void game_input()
 }
 
 void game_init() {
-    load_loops("data/loops.dat");
-
     whitgl_load_model(0, "data/obj/cube.wmd");
     whitgl_load_model(1, "data/obj/floor.wmd");
     whitgl_load_model(2, "data/obj/billboard.wmd");
     whitgl_load_model(3, "data/obj/skybox.wmd");
 
+    game_load_level("data/lvl/lvl1.png", &map);
+
     point2 p_pos = {1.5, 2};
     player_create(&p_pos, 0.0);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
-            if (rand() % 50 == 0 && map[x][y] == 0) {
+            if (rand() % 150 == 0 && map_get(&map, x, y) == 0) {
                 point2 rat_pos = {x + 0.5f, y + 0.5f};
                 rat_create(&rat_pos);
                 break;
@@ -1258,8 +1276,8 @@ void game_init() {
 }
 
 void game_cleanup() {
-    destr_loops();
     player_destroy();
+    game_free_level(&map);
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (!rats[i]) {
             rat_destroy(rats[i]);

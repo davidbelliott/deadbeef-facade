@@ -2,8 +2,8 @@
 #define COMMON_H
 
 enum {
-	MAP_WIDTH	= 24,
-	MAP_HEIGHT	= 24,
+	MAP_WIDTH	= 64,
+	MAP_HEIGHT	= 64,
 	CELL_SIZE	= 4,
 };
 
