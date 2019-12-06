@@ -11,4 +11,6 @@ void intro_input();
 void intro_frame();
 void intro_pause(bool paused);
 
+void intro_set_text(char *newtext);
+
 #endif

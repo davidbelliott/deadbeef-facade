@@ -1,6 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <whitgl/sys.h>
+#include <stdbool.h>
+
 enum {
 	MAP_WIDTH	= 64,
 	MAP_HEIGHT	= 64,
@@ -48,9 +51,6 @@ enum {
 
 #define SHORT_TEXT_MAX_LEN 256
 
-#define N_TILE_TYPES 4
-
-
 typedef struct point2 {
 	double x;
 	double y;
@@ -69,5 +69,25 @@ typedef struct vector2 {
 int _mod(int a, int b);
 float _fmod(float a, float b);
 int _sign(double x);
+void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill);
+
+
+enum {
+    GAME_STATE_GAME = 0,
+    GAME_STATE_MENU = 1,
+    GAME_STATE_INTRO = 2
+};
+
+#define N_TILE_TYPES 5
+#define TILE_TYPE_FLOOR     0
+#define TILE_TYPE_BBRICK    1
+#define TILE_TYPE_RBRICK    2
+#define TILE_TYPE_STONE     3
+#define TILE_TYPE_PORTAL    4
+
+int tile_lvl_rgb[N_TILE_TYPES][4];
+int tile_tex_offset[N_TILE_TYPES][2];
+bool tile_walkable[N_TILE_TYPES];
 
 #endif
+

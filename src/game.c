@@ -4,6 +4,7 @@
 #include "anim.h"
 #include "rat.h"
 #include "physics.h"
+#include "intro.h"
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -23,20 +24,6 @@
 #include <string.h>
 
 whitgl_ivec crosshair_pos = {SCREEN_W / 2 - 8, SCREEN_H / 2 - 8};
-
-static int tile_lvl_rgb[N_TILE_TYPES][4] = {
-    {0, 0, 0},
-    {0, 0, 127},
-    {127, 0, 0},
-    {0, 0, 255}
-};
-
-static int tile_tex_offset[N_TILE_TYPES][2] = {
-    {0, 0},
-    {0, 0},
-    {256, 0},
-    {320, 0}
-};
 
 typedef struct note_pop_text_t {
     bool exists;
@@ -65,7 +52,7 @@ note_pop_text_t note_pop_text = { 0 };
 
 player_t* player = NULL;
 
-
+int level = 1;
 map_t map = {0};
 
 int cycles_to_astar = 0;
@@ -101,6 +88,40 @@ static void player_create(whitgl_fvec *pos, double angle) {
     player->health = 100;
     player->damage_severity = 0.0f;
     player->targeted_rat = -1;
+}
+
+void game_load_level(char *levelname, map_t *map) {
+    unsigned char *data;
+    whitgl_int w = 0, h = 0;
+    bool ret = whitgl_sys_load_png(levelname, &w, &h, &data);
+    if (!ret) {
+        map->data = NULL;
+        return;
+    }
+
+    map->w = (int)w;
+    map->h = (int)h;
+    map->data = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
+    memset(map->data, 0, sizeof(unsigned char) * w * h);
+
+    int data_idx, tile;
+    for (int i = 0; i < w * h; i++) {
+        data_idx = 4 * i;
+        tile = 0;
+        for (int j = 0; j < N_TILE_TYPES; j++) {
+            if (tile_lvl_rgb[j][0] == data[data_idx]
+                    && tile_lvl_rgb[j][1] == data[data_idx + 1]
+                    && tile_lvl_rgb[j][2] == data[data_idx + 2]) {
+                tile = j;
+                break;
+            }
+        }
+        map->data[i] = tile;
+    }
+}
+
+void game_free_level(map_t *map) {
+    free(map->data);
 }
 
 void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
@@ -171,13 +192,6 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 3, floor_size);
     whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
     whitgl_sys_draw_model(1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
-}
-
-static void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill) {
-    whitgl_sys_draw_iaabb(iaabb, fill);
-    whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-    whitgl_ivec text_pos = {iaabb.a.x, iaabb.a.y};
-    whitgl_sys_draw_text(font, title, text_pos);
 }
 
 static void draw_overlay(int cur_loop, int cur_note) {
@@ -369,7 +383,7 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
 
         bool draw = false;
         for (;;) {
-            if (MAP_GET(&map, x, y) != 0) {
+            if (!tile_walkable[MAP_GET(&map, x, y)]) {
                 draw = true;
                 break;
             }
@@ -443,7 +457,7 @@ void player_deal_damage(player_t *p, int dmg) {
     p->health = MAX(0, p->health - dmg);
 }
 
-static bool player_update(player_t *p, float dt)
+static int player_update(player_t *p, float dt)
 {
     p->look_direction.x = cos(p->angle);
     p->look_direction.y = sin(p->angle);
@@ -452,7 +466,18 @@ static bool player_update(player_t *p, float dt)
     world_move_dir.y = (p->look_direction.y*p->move_direction.x - p->look_direction.x*p->move_direction.y);
     set_vel(p->phys, world_move_dir, MOVE_SPEED);
     p->damage_severity = MAX(0.0f, p->damage_severity - dt);
-    return p->health != 0;
+
+    // Test for portals, doors, etc
+    if (MAP_GET(&map, (int)p->phys->pos.x, (int)p->phys->pos.y) == TILE_TYPE_PORTAL) {
+        level++;
+        char levelstr[256];
+        snprintf(levelstr, 256, "data/lvl/lvl%d.png", level);
+        intro_set_text(levelstr);
+        game_free_level(&map);
+        game_load_level(levelstr, &map);
+        return GAME_STATE_INTRO;
+    }
+    return GAME_STATE_GAME;
 }
 
 /*static void notes_update(struct player_t *p, int cur_loop, int cur_note) {
@@ -479,39 +504,6 @@ static void note_pop_text_update(float dt) {
         }
 }
 
-void game_load_level(char *levelname, map_t *map) {
-    unsigned char *data;
-    whitgl_int w = 0, h = 0;
-    bool ret = whitgl_sys_load_png(levelname, &w, &h, &data);
-    if (!ret) {
-        map->data = NULL;
-        return;
-    }
-
-    map->w = (int)w;
-    map->h = (int)h;
-    map->data = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
-    memset(map->data, 0, sizeof(unsigned char) * w * h);
-
-    int data_idx, tile;
-    for (int i = 0; i < w * h; i++) {
-        data_idx = 4 * i;
-        tile = 0;
-        for (int j = 0; j < N_TILE_TYPES; j++) {
-            if (tile_lvl_rgb[j][0] == data[data_idx]
-                    && tile_lvl_rgb[j][1] == data[data_idx + 1]
-                    && tile_lvl_rgb[j][2] == data[data_idx + 2]) {
-                tile = j;
-                break;
-            }
-        }
-        map->data[i] = tile;
-    }
-}
-
-void game_free_level(map_t *map) {
-    free(map->data);
-}
 
 void game_pause(bool paused) {
     whitgl_loop_set_paused(AMBIENT_MUSIC, paused);
@@ -577,6 +569,7 @@ void game_init() {
     whitgl_load_model(2, "data/obj/billboard.wmd");
     whitgl_load_model(3, "data/obj/skybox.wmd");
 
+    level = 1;
     game_load_level("data/lvl/lvl1.png", &map);
 
     whitgl_fvec p_pos = {1.5, 2};
@@ -608,6 +601,10 @@ void game_cleanup() {
 void game_start() {
     whitgl_loop_seek(AMBIENT_MUSIC, 0.0f);
     whitgl_loop_set_paused(AMBIENT_MUSIC, false);
+}
+
+void game_stop() {
+    whitgl_loop_set_paused(AMBIENT_MUSIC, true);
 }
 
 int game_update(float dt) {
@@ -648,7 +645,7 @@ int game_update(float dt) {
     note_pop_text_update(dt);
     
     time_since_note = _fmod(song_time, secs_per_note);
-    player_update(player, dt);
+    int next_state = player_update(player, dt);
     if(cycles_to_astar == 0) {
         rats_update(player, dt, cur_note, true, &map);
         cycles_to_astar = 100;
@@ -660,7 +657,7 @@ int game_update(float dt) {
 
     rats_prune(player);
 
-    return 0;
+    return next_state;
 }
 
 void game_frame() {

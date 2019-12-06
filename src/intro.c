@@ -10,10 +10,13 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define PER_CHAR_DELAY 0.02f
 
-const char text[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nisl erat, tempor at aliquam a, molestie eget nulla. Duis consequat dui vitae suscipit elementum. Proin in pharetra nunc. Vivamus commodo sapien velit, eleifend rutrum tortor consequat vitae. Curabitur eu venenatis nibh. Cras sagittis ac nisl interdum pharetra. Nunc quis lacus mi. Nulla eget sapien non lorem pulvinar mollis at id diam. Phasellus et tortor a lacus malesuada ullamcorper nec et felis. Suspendisse ultricies, augue sed pharetra facilisis, sem augue lobortis ante, et lobortis ipsum diam in augue. Pellentesque aliquam feugiat imperdiet. Nam imperdiet arcu eget tellus tempor iaculis. In ac nulla enim. Proin posuere massa lectus, vel lobortis tellus tempor finibus. Nam in arcu laoreet, elementum massa non, aliquam urna. Integer at purus iaculis, ornare risus ut, fringilla tellus.\n\nMauris egestas eros quis mauris cursus ultricies. Nulla posuere mauris eget dui feugiat accumsan. Nam pulvinar, libero sed aliquet dignissim, mi ipsum rutrum elit, id malesuada diam ex eu orci. Fusce eu velit leo. Aliquam finibus a magna vel consectetur. Duis sagittis cursus fringilla. Ut fermentum quam id tempus auctor. Praesent elit enim, pellentesque a mi vel, semper cursus orci. Curabitur iaculis lobortis viverra. Suspendisse consectetur tortor sit amet neque suscipit, ac aliquam mauris egestas. In hac habitasse platea dictumst. Maecenas venenatis odio quis eros interdum, id semper libero rutrum.";
+char text[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nisl erat, tempor at aliquam a, molestie eget nulla. Duis consequat dui vitae suscipit elementum. Proin in pharetra nunc. Vivamus commodo sapien velit, eleifend rutrum tortor consequat vitae. Curabitur eu venenatis nibh. Cras sagittis ac nisl interdum pharetra. Nunc quis lacus mi. Nulla eget sapien non lorem pulvinar mollis at id diam. Phasellus et tortor a lacus malesuada ullamcorper nec et felis. Suspendisse ultricies, augue sed pharetra facilisis, sem augue lobortis ante, et lobortis ipsum diam in augue. Pellentesque aliquam feugiat imperdiet. Nam imperdiet arcu eget tellus tempor iaculis. In ac nulla enim. Proin posuere massa lectus, vel lobortis tellus tempor finibus. Nam in arcu laoreet, elementum massa non, aliquam urna. Integer at purus iaculis, ornare risus ut, fringilla tellus.\n\nMauris egestas eros quis mauris cursus ultricies. Nulla posuere mauris eget dui feugiat accumsan. Nam pulvinar, libero sed aliquet dignissim, mi ipsum rutrum elit, id malesuada diam ex eu orci. Fusce eu velit leo. Aliquam finibus a magna vel consectetur. Duis sagittis cursus fringilla. Ut fermentum quam id tempus auctor. Praesent elit enim, pellentesque a mi vel, semper cursus orci. Curabitur iaculis lobortis viverra. Suspendisse consectetur tortor sit amet neque suscipit, ac aliquam mauris egestas. In hac habitasse platea dictumst. Maecenas venenatis odio quis eros interdum, id semper libero rutrum.";
+
+char path_str[] = "data/lvl/lvl1.json";
 
 float elapsed_time;
 int text_chars;
@@ -87,6 +90,7 @@ static void wrap_text(const char *text, char *wrapped, int wrapped_len, whitgl_i
 }
 
 void intro_init() {
+    whitgl_sys_add_image(1, "data/intro/lvl1.png");
 }
 
 void intro_cleanup() {
@@ -96,7 +100,7 @@ void intro_cleanup() {
 void intro_start() {
     elapsed_time = 0.0f;
     text_chars = 0;
-    next_gamestate = 2;
+    next_gamestate = GAME_STATE_INTRO;
 }
 
 int intro_update(float dt) {
@@ -118,7 +122,7 @@ void intro_input() {
         if (text_chars != strlen(text)) {
             text_chars = strlen(text);
         } else {
-            next_gamestate = 0;
+            next_gamestate = GAME_STATE_GAME;
         }
     }
 }
@@ -126,7 +130,22 @@ void intro_input() {
 void intro_frame() {
     whitgl_sys_draw_init(0);
     whitgl_sys_enable_depth(false);
-    whitgl_iaabb bounding_box = {{16, 16}, {SCREEN_W - 16, SCREEN_H - 16}};
+
+
+    whitgl_iaabb iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
+    whitgl_sys_color col = {0, 0, 255, 255};
+    char path[256];
+    snprintf(path, 256, "PATH: %s", path_str);
+    draw_window(path, iaabb, col);
+
+    whitgl_sprite sprite = {1, {0,0},{128,128}};
+    whitgl_ivec frametr = {0, 0};
+    whitgl_ivec pos = {SCREEN_W - 128, FONT_CHAR_H};
+    whitgl_sys_draw_sprite(sprite, frametr, pos);
+
+
+
+    whitgl_iaabb bounding_box = {{FONT_CHAR_W, FONT_CHAR_H}, {SCREEN_W - FONT_CHAR_W - 128, SCREEN_H - FONT_CHAR_H}};
     int wrapped_len = strlen(text) + SCREEN_H / FONT_CHAR_H;    // strlen + max_newlines + 1
     char *wrapped_text = (char*)malloc(wrapped_len);
     wrap_text(text, wrapped_text, wrapped_len, bounding_box);
@@ -137,4 +156,8 @@ void intro_frame() {
 
 void intro_pause(bool paused) {
 
+}
+
+void intro_set_text(char *newtext) {
+    strcpy(text, newtext);
 }

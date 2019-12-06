@@ -19,7 +19,10 @@ void player_deal_damage(player_t *p, int dmg);
 
 void game_init();
 void game_cleanup();
+// Action to take when entering this from another state
 void game_start();
+// Action to take when leaving this for another state
+void game_stop();
 int game_update(float dt);
 void game_input();
 void game_frame();

@@ -79,7 +79,7 @@ list_t* astar(whitgl_ivec start, whitgl_ivec end, map_t *map) {
     list_t *closed = NULL;
     push_front(&open, astar_alloc_node(start.x, start.y, NULL));
 
-    for (int n_iters = 0; n_iters < 32 && open; n_iters++) {
+    for (int n_iters = 0; n_iters < 256 && open; n_iters++) {
         astar_node_t *q = (astar_node_t*)pop_front(&open);
         astar_insert_sort_f(&closed, q);
         list_t *s = NULL;

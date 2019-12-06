@@ -3,6 +3,7 @@
 #include "game.h"
 #include "astar.h"
 
+#include <whitgl/logging.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -163,6 +164,7 @@ void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_ast
             if (line_of_sight && pow(rats[i]->phys->pos.x - p->phys->pos.x, 2) + pow(rats[i]->phys->pos.y - p->phys->pos.y, 2) <= pow(RAT_ATTACK_RADIUS, 2) && cur_note % RAT_ATTACK_NOTES == 0) {
                 player_deal_damage(p, RAT_DAMAGE);
             }
+            // If within astar range and using astar, find a path
             if(!line_of_sight && use_astar && diag_distance(p->phys->pos, rats[i]->phys->pos) < 20.0) {
                 whitgl_ivec start = {(int)(rats[i]->phys->pos.x), (int)(rats[i]->phys->pos.y)};
                 whitgl_ivec end = {(int)(p->phys->pos.x), (int)(p->phys->pos.y)};
@@ -172,15 +174,19 @@ void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_ast
                     free(start_node);
                 }
             }
+            // Follow whatever path the rat has found, if can't see player
             if(!line_of_sight && rats[i]->path) {
                 astar_node_t *next_node = (astar_node_t*)rats[i]->path->data;
                 whitgl_fvec target = {(double)next_node->pt.x + 0.5, (double)next_node->pt.y + 0.5};
+                WHITGL_LOG("Following path -> (%f, %f)", target.x, target.y);
                 bool reached = move_toward_point(rats[i]->phys, &target, RAT_SPEED, 0.1);
                 if(reached) {
                     astar_node_t *reached_node = pop_front(&rats[i]->path);
                     free(reached_node);
                 }
             } else if(line_of_sight) {
+                // Otherwise go straight towards the player
+                WHITGL_LOG("Following line of sight");
                 rats[i]->path = NULL;
                 whitgl_fvec target;
                 target.x = p->phys->pos.x - (p->phys->pos.x - rats[i]->phys->pos.x) * 0.5;
@@ -217,7 +223,7 @@ int get_closest_targeted_rat(whitgl_fvec player_pos, whitgl_fvec player_look, ma
 
 void rats_destroy_all(player_t *p) {
     for (int i = 0; i < MAX_N_RATS; i++) {
-        if (!rats[i]) {
+        if (rats[i]) {
             rat_destroy(rats[i], p);
         }
     }

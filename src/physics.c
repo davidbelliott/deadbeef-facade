@@ -72,7 +72,7 @@ static bool try_to_move(physics_obj *obj, map_t *map, whitgl_fvec pos)
 
     for (int x = x0; x <= x1; x++) {
         for (int y = y0; y <= y1; y++) {
-            if (MAP_GET(map, x, y))
+            if (!tile_walkable[MAP_GET(map, x, y)])
                 return false;
         }
     }
@@ -150,13 +150,8 @@ bool move_toward_point(physics_obj *obj, whitgl_fvec *target, double speed, doub
         obj->vel.y = 0.0;
         return true;
     }
-    whitgl_fvec dir;
-    dir.x = target->x - obj->pos.x;
-    dir.y = target->y - obj->pos.y;
-    float norm = whitgl_fsqrt(dir.x * dir.x + dir.y * dir.y);
-    norm = (norm == 0.0 ? 0.0 : 1.0 / norm);
-    obj->vel.x = dir.x * norm * speed;
-    obj->vel.y = dir.y * norm * speed;
+    whitgl_fvec dir = whitgl_fvec_sub(*target, obj->pos);
+    set_vel(obj, dir, speed);
     return false;
 }
 

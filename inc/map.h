@@ -7,6 +7,6 @@ typedef struct map_t {
     int h;
 } map_t;
 
-#define MAP_GET(map, x, y) (map)->data[y * (map)->h + x]
+#define MAP_GET(map, x, y) (map)->data[(y) * (map)->h + (x)]
 
 #endif // MAP_H

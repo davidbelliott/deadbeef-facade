@@ -61,33 +61,6 @@ void main()\
 }\
 ";
 
-const char* vertex_tex_src = "\
-#version 150\
-\n\
-\
-in vec3 position;\
-in vec2 texturepos;\
-in vec3 vertexColor;\
-in vec3 vertexNormal;\
-out vec2 Texturepos;\
-out vec3 fragmentColor;\
-out vec3 fragmentNormal;\
-out vec3 fragmentPosition;\
-out mat4 normalMatrix;\
-uniform mat4 m_model;\
-uniform mat4 m_view;\
-uniform mat4 m_perspective;\
-void main()\
-{\
-	gl_Position = m_perspective * m_view * m_model * vec4( position, 1.0 );\
-	Texturepos = texturepos;\
-	fragmentColor = vertexColor;\
-	fragmentNormal = vertexNormal;\
-	fragmentPosition = vec3( m_model * vec4( position, 1.0));\
-	normalMatrix = transpose(inverse(m_model));\
-}\
-";
-
 const char* vertex_billboard_src = "\
 #version 150\
 \n\
@@ -136,7 +109,6 @@ in vec2 Texturepos;\
 in vec3 fragmentNormal;\
 out vec4 outColor;\
 uniform sampler2D tex;\
-uniform sampler2D extra;\
 uniform float spread;\
 void main()\
 {\
@@ -162,7 +134,6 @@ in vec2 Texturepos;\
 in vec3 fragmentNormal;\
 out vec4 outColor;\
 uniform sampler2D tex;\
-uniform sampler2D extra;\
 uniform float spread;\
 void main()\
 {\
@@ -174,18 +145,6 @@ void main()\
         float shadeFactor = dot(fragmentNormal.xy, vec2(0.2, 0.2));\
         vec4 color = (1.0 + shadeFactor) * tex_color * (1.0 - fogAmount);\
         outColor = vec4(color.r, color.g, color.b, 1.0);\
-}\
-";
-
-const char* flat_src = "\
-#version 150\
-\n\
-uniform vec4 color;\
-out vec4 outColor;\
-void main()\
-{\
-        if (color.a == 0.0) discard;\
-        outColor = color;\
 }\
 ";
 
@@ -251,14 +210,8 @@ void main()\
 }\
 ";
 
-enum {
-    GAME_STATE_GAME = 0,
-    GAME_STATE_MENU = 1,
-    GAME_STATE_INTRO = 2
-};
-
-void input(bool *paused, int game_state) {
-    if (whitgl_input_pressed(WHITGL_INPUT_ESC)) {
+void input(bool *paused, bool *running, int game_state) {
+    /*if (whitgl_input_pressed(WHITGL_INPUT_ESC)) {
         *paused = !*paused;
         switch (game_state) {
             case GAME_STATE_GAME:
@@ -270,6 +223,9 @@ void input(bool *paused, int game_state) {
             default:
                 break;
         }
+    }*/
+    if (whitgl_input_pressed(WHITGL_INPUT_ESC)) {
+        *running = false;
     }
 }
 
@@ -287,20 +243,8 @@ int main(int argc, char* argv[])
         if (!whitgl_sys_init(&setup))
             return 1;
 
-        whitgl_shader flat_shader = whitgl_shader_zero;
-        flat_shader.fragment_src = flat_src;
-	flat_shader.num_uniforms = 1;
-	flat_shader.uniforms[0].type = WHITGL_UNIFORM_COLOR;
-	flat_shader.uniforms[0].name = "color";
-	if(!whitgl_change_shader( WHITGL_SHADER_FLAT, flat_shader))
-		return false;
-
         whitgl_shader tex_shader = whitgl_shader_zero;
-        tex_shader.vertex_src = vertex_tex_src;
         tex_shader.fragment_src = frag_tex_src;
-        tex_shader.num_uniforms = 1;
-        tex_shader.uniforms[0].name = "tex";
-        tex_shader.uniforms[0].type = WHITGL_UNIFORM_IMAGE;
         if (!whitgl_change_shader(WHITGL_SHADER_TEXTURE, tex_shader))
             return 1;
 
@@ -374,6 +318,7 @@ int main(int argc, char* argv[])
 	//whitgl_sound_add(0, "data/snd/tick.ogg");
 
         game_init();
+        intro_init();
 
 
         int game_state = GAME_STATE_INTRO;
@@ -389,6 +334,7 @@ int main(int argc, char* argv[])
             whitgl_sound_update();
             dt = whitgl_timer_tick();
             whitgl_input_update();
+            // Update
             if (!paused) {
                 time += dt;
                 switch (game_state) {
@@ -404,7 +350,9 @@ int main(int argc, char* argv[])
                         break;
                 }
             }
-            input(&paused, game_state);
+            // Input
+            input(&paused, &running, game_state);
+            // Draw
             switch (game_state) {
                 case GAME_STATE_GAME:
                     game_frame();
@@ -415,7 +363,19 @@ int main(int argc, char* argv[])
                 default:
                     break;
             }
+            // State change logic
             if (next_state != game_state) {
+                // Exit logic
+                switch (game_state) {
+                    case GAME_STATE_GAME:
+                        game_stop();
+                        break;
+                    case GAME_STATE_INTRO:
+                        break;
+                    default:
+                        break;
+                }
+                // Entrance logic
                 switch (next_state) {
                     case GAME_STATE_GAME:
                         game_start();
@@ -431,6 +391,7 @@ int main(int argc, char* argv[])
         }
 
         game_cleanup();
+        intro_cleanup();
 
         whitgl_input_shutdown();
         // Shutdown sound
