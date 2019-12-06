@@ -1,5 +1,9 @@
-#include "list.h"
+#include "game.h"
 #include "common.h"
+#include "map.h"
+#include "anim.h"
+#include "rat.h"
+#include "physics.h"
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -18,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+whitgl_ivec crosshair_pos = {SCREEN_W / 2 - 8, SCREEN_H / 2 - 8};
+
 static int tile_lvl_rgb[N_TILE_TYPES][4] = {
     {0, 0, 0},
     {0, 0, 127},
@@ -32,76 +38,6 @@ static int tile_tex_offset[N_TILE_TYPES][2] = {
     {320, 0}
 };
 
-/*static unsigned int map[MAP_WIDTH][MAP_HEIGHT] =
-{
-	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1},
-	{1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1},
-	{1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,0,3,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,0,0,0,0,3,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,0,3,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,0,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-	{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
-};*/
-
-
-
-static unsigned int drawn[MAP_WIDTH][MAP_HEIGHT] = {{ 0 }};
-
-typedef struct map_t {
-    unsigned char *data;
-    int w;
-    int h;
-} map_t;
-
-typedef struct physics_obj {
-    unsigned int id;
-    point2 pos;
-    vector2 vel;
-    double radius;
-} physics_obj;
-
-typedef struct astar_node_t {
-    ipoint2 pt;
-    double f, g, h;
-    struct astar_node_t *from;
-} astar_node_t;
-
-typedef struct anim_obj {
-    unsigned int id;
-    whitgl_sprite sprite;
-    whitgl_ivec frametr;
-    int n_frames[MAX_N_ANIM_STATES];
-    int delay;  // delay between frames in number of beats (min 1)
-    bool loop;
-} anim_obj;
-
-typedef struct player_t {
-    physics_obj *phys;
-    double angle;
-    struct vector2 look_direction;
-    struct vector2 move_direction;
-    int health;
-    float time_since_damaged;
-    int targeted_rat;
-} player_t;
-
 typedef struct note_pop_text_t {
     bool exists;
     float life;
@@ -115,27 +51,6 @@ enum {
     RAT_TYPE_REPRODUCER
 };
 
-typedef struct note_t {
-    bool exists;
-    char type;
-    bool popped;
-    bool hold;
-    whitgl_ivec pos;
-    int channel;
-    anim_obj *anim;
-} note_t;
-
-typedef struct rat_t {
-    unsigned int id;
-    int type;
-    physics_obj *phys;
-    anim_obj *anim;
-    list_t *path;
-    int health;
-    bool dead;
-    note_t beat[NOTES_PER_MEASURE * MEASURES_PER_LOOP];
-} rat_t;
-
 typedef struct loop_t {
     char name[SHORT_TEXT_MAX_LEN];
     note_t notes[TOTAL_NUM_NOTES];
@@ -144,17 +59,12 @@ typedef struct loop_t {
 int earliest_active_note_offset = 0;
 int cur_loop = 0;
 int cur_note = 0;
-whitgl_ivec note_pop_pos = {SCREEN_W / 2 - 8, SCREEN_H / 2 - 8};
 
 note_pop_text_t note_pop_text = { 0 };
 
-anim_obj *anim_objs[MAX_N_ANIM_OBJS] = {0};
-
-physics_obj* phys_objs[MAX_N_PHYS] = {0};
 
 player_t* player = NULL;
 
-rat_t* rats[MAX_N_RATS] = {0};
 
 map_t map = {0};
 
@@ -167,114 +77,10 @@ whitgl_float song_time = 0.0f;
 whitgl_float song_len = 0.0f;
 
 // Definitions of static helper functions
-static int get_closest_targeted_rat(point2 player_pos, vector2 player_look);
 
-static unsigned char map_get(map_t *map, int x, int y) {
-    return map->data[y * map->h + x];
-}
-
-static anim_obj *anim_create(whitgl_sprite sprite, whitgl_ivec frametr, int n_frames[MAX_N_ANIM_STATES], int delay, bool loop) {
-    int i = 0;
-    for (i = 0; i < MAX_N_ANIM_OBJS; i++) {
-        if (!anim_objs[i])
-            break;
-    }
-    anim_obj *anim = NULL;
-    if (i < MAX_N_ANIM_OBJS) {
-        anim = (anim_obj*)malloc(sizeof(anim_obj));
-        anim->id = i;
-        anim->sprite = sprite;
-        anim->frametr = frametr;
-        memcpy(anim->n_frames, n_frames, MAX_N_ANIM_STATES * sizeof(int));
-        anim->delay = MAX(1, delay);
-        anim->loop = loop;
-        anim_objs[i] = anim;
-    } else {
-        WHITGL_LOG("Error: out of animations");
-    }
-    return anim;
-}
-
-static int get_targeted_rat(int cur_targeted, point2 player_pos, vector2 player_look) {
-    int next_targeted = get_closest_targeted_rat(player_pos, player_look);
+static int get_targeted_rat(int cur_targeted, whitgl_fvec player_pos, whitgl_fvec player_look) {
+    int next_targeted = get_closest_targeted_rat(player_pos, player_look, &map);
     return next_targeted;
-}
-
-static void anim_destroy(anim_obj *anim) {
-    anim_objs[anim->id] = NULL;
-    free(anim);
-}
-
-void apply_anim_to_model(char *model_data, int n_verts, anim_obj *anim) {
-    float *data = (float*)model_data;
-    for (int i = 0; i < n_verts; i++) {
-        int idx = 11 * i + 3;   // stride: 11, texturepos offset: 3
-        data[idx] += anim->sprite.size.x * anim->frametr.x;
-        data[idx + 1] += anim->sprite.size.y * anim->frametr.y;
-    }
-}
-
-whitgl_ivec get_note_pos(int channel, int offset_idx, int earliest_idx, int latest_idx) {
-    int total_path_len = note_pop_pos.x + 8 + note_pop_pos.y - 8;
-    whitgl_ivec pos = {0, 0};
-    float note_completion = NOTES_PER_MEASURE * BPM / 60.0f / 4.0f * time_since_note;
-    float completion = ((float)(earliest_idx - offset_idx) + note_completion) / ((float)(earliest_idx));
-    float ease_completion = completion >= 1.0f ? 1.0f : 1.0f - (completion - 1.0f) * (completion - 1.0f);
-    //int x_total_offset = (int)((float)SCREEN_W * (channel + 1.0f) / 5.0f) - note_pop_pos.x;
-    int x_total_offset = 0;
-    int y_total_offset = -note_pop_pos.y - 16;
-    /*int path_pos = (int)(completion * total_path_len);
-    if (path_pos < note_pop_pos.x + 8) {
-        pos.x = SCREEN_W + 8 - path_pos;
-        pos.y = 8;
-    } else {
-        pos.x = note_pop_pos.x;
-        pos.y = path_pos - (note_pop_pos.x + 8) + 8;
-    }*/
-    pos.x = x_total_offset * (1.0f - completion) + note_pop_pos.x;
-    pos.y = y_total_offset * (1.0f - completion) + note_pop_pos.y;
-    return pos;
-}
-
-static void note_create(note_t *note, int exists) {
-    if (exists) {
-        whitgl_sprite note_sprite = {0, {128,64},{16,16}};
-        whitgl_ivec frametr = {0, 0};
-        int n_frames[MAX_N_ANIM_STATES] = {1, 4};
-        anim_obj *anim = anim_create(note_sprite, frametr, n_frames, NOTES_PER_MEASURE / 16, false);
-        note->exists = true;
-        note->type = 0;
-        note->popped = false;
-        note->hold = false;
-        note->pos.x = 0;
-        note->pos.y = 0;
-        note->channel = rand() % 4;
-        note->anim = anim;
-    } else {
-        note->exists = false;
-    }
-}
-
-static physics_obj* phys_create(point2 *pos, vector2 *vel, double radius) {
-    physics_obj *ptr = NULL;
-    for (int i = 0; i < MAX_N_PHYS; i++) {
-        if (!phys_objs[i]) {
-            printf("Putting in index %d\n", i);
-            ptr = (physics_obj*)malloc(sizeof(physics_obj));
-            ptr->id = i;
-            ptr->pos = *pos;
-            ptr->vel = *vel;
-            ptr->radius = radius;
-            phys_objs[ptr->id] = ptr;
-            break;
-        }
-    }
-    return ptr;
-}
-
-static void phys_destroy(physics_obj *phys) {
-    phys_objs[phys->id] = NULL;
-    free(phys);
 }
 
 static void player_destroy() {
@@ -283,46 +89,18 @@ static void player_destroy() {
     player = NULL;
 }
 
-static void player_create(point2 *pos, double angle) {
+static void player_create(whitgl_fvec *pos, double angle) {
     if(player)
         player_destroy();
     player = (player_t*)malloc(sizeof(player_t));
-    vector2 zero = {0.0, 0.0};
+    whitgl_fvec zero = {0.0, 0.0};
     player->phys = phys_create(pos, &zero, 0.2);
-    assert(player->phys);
     player->angle = angle;
     player->look_direction = zero;
     player->move_direction = zero;
     player->health = 100;
-    player->time_since_damaged = 0.0f;
+    player->damage_severity = 0.0f;
     player->targeted_rat = -1;
-}
-
-static rat_t* rat_create(point2 *pos) {
-    rat_t *rat = NULL;
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if(!rats[i]) {
-            rat = (rat_t*)malloc(sizeof(rat_t));
-            rat->id = i;
-            vector2 vel = {0.0, 0.0};
-            rat->phys = phys_create(pos, &vel, 0.3);
-            assert(rat->phys);
-            whitgl_sprite rat_sprite = {0, {128,0}, {64,64}};
-            whitgl_ivec frametr = {0, 0};
-            int n_frames[MAX_N_ANIM_STATES] = {2};
-            rat->anim = anim_create(rat_sprite, frametr, n_frames, NOTES_PER_MEASURE / 4, true);
-            rat->path = NULL;
-            rat->health = 50;
-            rat->dead = false;
-
-            for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
-                note_create(&rat->beat[j], rand() % 16 == 0);
-            }
-            rats[rat->id] = rat;
-            break;
-        }
-    }
-    return rat;
 }
 
 void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
@@ -331,101 +109,9 @@ void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
     strncpy(note_pop_text.text, text, SHORT_TEXT_MAX_LEN);
 }
 
-static void rat_destroy(rat_t *rat) {
-    if (player->targeted_rat == rat->id) {
-        player->targeted_rat = -1;
-    }
-    phys_destroy(rat->phys);
-    rat->phys = NULL;
-    rats[rat->id] = NULL;
-    free(rat);
-}
-
-static void set_vel(physics_obj *phys, vector2 *dir, double speed) {
-    double normalization_const = sqrt(pow(dir->x, 2) + pow(dir->y, 2));
-    normalization_const = (normalization_const == 0.0 ? 0.0 : 1.0 / normalization_const);
-    phys->vel.x = dir->x * normalization_const * speed;
-    phys->vel.y = dir->y * normalization_const * speed;
-}
-
-static bool try_to_move(physics_obj *obj, struct point2 *pos)
-{
-	int x0, x1, y0, y1;
-	double size = obj->radius;
-
-	x0 = pos->x - size;
-	x1 = pos->x + size;
-	y0 = pos->y - size;
-	y1 = pos->y + size;
-
-	for (int x = x0; x <= x1; x++) {
-		for (int y = y0; y <= y1; y++) {
-			if (map_get(&map, x, y))
-				return false;
-		}
-	}
-        for (int i = 0; i < MAX_N_PHYS; i++) {
-            if(phys_objs[i] && i != obj->id && pow(phys_objs[i]->pos.x - pos->x, 2) + pow(phys_objs[i]->pos.y - pos->y, 2)
-                    < pow(phys_objs[i]->radius + obj->radius, 2)) {
-                return false;
-            }
-        }
-	return true;
-}
-
-static void clip_move(physics_obj *phys, point2 *new_pos) {
-    struct point2 pos;
-    struct point2 old_pos = phys->pos;
-
-    pos.x = new_pos->x;
-    pos.y = new_pos->y;
-    if(try_to_move(phys, &pos)) {
-        phys->pos = pos;
-        return;
-    }
-
-    pos.x = new_pos->x;
-    pos.y = old_pos.y;
-    if(try_to_move(phys, &pos)) {
-        phys->pos = pos;
-        return;
-    }
-
-    pos.x = old_pos.x;
-    pos.y = new_pos->y;
-    if(try_to_move(phys, &pos)) {
-        phys->pos = pos;
-        return;
-    }
-
-    phys->pos = old_pos;
-}
-
-
-static void phys_obj_update(physics_obj *phys, float dt) {
-    //printf("Moving with vel (%f, %f)\n", phys->vel.x, phys->vel.y);
-    struct point2 new_pos;
-    new_pos.x = phys->pos.x + phys->vel.x * dt;
-    new_pos.y = phys->pos.y + phys->vel.y * dt;
-    clip_move(phys, &new_pos);
-}
-
-
 static double degrees_to_radians(double angle) {
 	return angle * M_PI/180.0;
 }
-
-static bool eq(ipoint2 p1, ipoint2 p2) {
-    return p1.x == p2.x && p1.y == p2.y;
-}
-
-// The VBO containing the 4 vertices of the particles.
-static struct point2 square_mesh[] = {
-    {-0.5,  0.0},
-    { 0.5,  0.0},
-    { 0.5,  1.0},
-    {-0.5,  1.0}
-};
 
 whitgl_fmat make_billboard_mat(whitgl_fmat BM, whitgl_fmat const MV)
 {
@@ -441,24 +127,6 @@ whitgl_fmat make_billboard_mat(whitgl_fmat BM, whitgl_fmat const MV)
         ret.mat[3*4+i] = MV.mat[3*4+i];
     }
     return ret;
-}
-
-
-astar_node_t* astar_alloc_node(int x, int y, astar_node_t *from) {
-    astar_node_t *ptr = (astar_node_t*)malloc(sizeof(astar_node_t));
-    ptr->pt.x = x;
-    ptr->pt.y = y;
-    ptr->f = 0;
-    ptr->g = 0;
-    ptr->h = 0;
-    ptr->from = from;
-    return ptr;
-}
-
-astar_node_t* astar_alloc_copy(astar_node_t *node) {
-    astar_node_t *ptr = (astar_node_t*)malloc(sizeof(astar_node_t));
-    memcpy(ptr, node, sizeof(astar_node_t));
-    return ptr;
 }
 
 /*void print_list(node_t **head) {
@@ -481,136 +149,12 @@ void print_path(node_t *end) {
     printf("\n");
 }*/
 
-void astar_insert_sort_f(list_t **head, astar_node_t *node) {
-    list_t *ibef = *head;
-    if(!ibef) { //empty list: create a new linked list
-        push_front(head, node);
-    } else {
-        bool inserted = false;
-        for(; ibef->next; ibef=ibef->next) {
-            if(((astar_node_t*)ibef->data)->f > node->f) {
-                insert_before(head, ibef, node);
-                inserted = true;
-                break;
-            }
-        }
-        if(!inserted)
-            insert_after(head, ibef, (void*)node);
-    }
-}
-
-bool astar_in(list_t **head, astar_node_t *node) {
-    bool in = false;
-    list_t *q = *head;
-    while(q) {
-        if(eq(((astar_node_t*)q->data)->pt, node->pt)) {
-            return true;
-        }
-        q = q->next;
-    }
-    return false;
-}
-
-double idiag_distance(ipoint2 start, ipoint2 end) {
-    int max = MAX(abs(start.x - end.x), abs(start.y - end.y));
-    int min = MIN(abs(start.x - end.x), abs(start.y - end.y));
-    return (double)(max - min) + SQRT2 * (double)min;
-}
-
-double diag_distance(point2 start, point2 end) {
-    double max = MAX(abs(start.x - end.x), abs(start.y - end.y));
-    double min = MIN(abs(start.x - end.x), abs(start.y - end.y));
-    return (max - min) + SQRT2 * min;
-}
-
-list_t* reconstruct_path(astar_node_t *q) {
-    list_t *path = NULL;
-    while(q) {
-        push_front(&path, astar_alloc_copy(q));
-        q = q->from;
-    }
-    return path;
-}
-
-void astar_free_node_list(list_t **q) {
-    while (*q) {
-        astar_node_t *data = (astar_node_t*)pop_front(q);
-        free(data);
-    }
-}
-
-list_t* astar(ipoint2 start, ipoint2 end) {
-    static const int offsets[] = {-1, 0, 1};
-    list_t *open = NULL;
-    list_t *closed = NULL;
-    push_front(&open, astar_alloc_node(start.x, start.y, NULL));
-
-    for (int n_iters = 0; n_iters < 1024 && open; n_iters++) {
-        astar_node_t *q = (astar_node_t*)pop_front(&open);
-        astar_insert_sort_f(&closed, q);
-        list_t *s = NULL;
-        int x = q->pt.x;
-        int y = q->pt.y;
-        if(eq(q->pt, end)) {  // goal reached
-            list_t *path = reconstruct_path(q);
-            astar_free_node_list(&open);
-            astar_free_node_list(&closed);
-            return path;
-        }
-        for(int i = 0; i < 3; i++) {
-            int dx = offsets[i];
-            for(int j = 0; j < 3; j++) {
-                int dy = offsets[j];
-                if(     (dx != 0 || dy != 0) // not both zero
-                        && x+dx < MAP_WIDTH && x+dx >= 0 && y+dy < MAP_HEIGHT && y+dy >= 0 // within bounds
-                        && map_get(&map, x+dx, y+dy) == 0 // no wall in target spot
-                        && (dx == 0 || dy == 0 || (map_get(&map, x, y+dy) == 0 && map_get(&map, x+dx, y) == 0))) // valid if diagonal
-                {
-                    /*if(q->pt.x == 9 && q->pt.y == 5)
-                        printf("Found neighbor: (%d, %d)\n", x+dx, y+dy);*/
-                    push_front(&s, astar_alloc_node(x+dx, y+dy, q));
-                }
-            }
-        }
-        while(s) {
-            astar_node_t *s_node = (astar_node_t*)s->data;
-            s_node->g = q->g + idiag_distance(s_node->pt, q->pt);
-            s_node->h = idiag_distance(s_node->pt, end);
-            s_node->f = s_node->g + s_node->h;
-            bool add = true;
-            add = !astar_in(&closed, s_node);
-            list_t *check = open;
-            while(add && check) {
-                astar_node_t *c_node = (astar_node_t*)check->data;
-                if(eq(s_node->pt, c_node->pt) && s_node->g >= c_node->g) {
-                    add = false;
-                    break;
-                }
-                check = check->next;
-            }
-            if(add) {
-                astar_insert_sort_f(&open, astar_alloc_copy(s_node));
-            }
-            s = s->next;
-        }
-        astar_free_node_list(&s);
-    }
-    //pathfinding failed
-    astar_free_node_list(&open);
-    astar_free_node_list(&closed);
-    return NULL;
-}
 
 static void draw_skybox(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
     whitgl_sys_draw_model(3, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
-static void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
-    whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
-    whitgl_sys_draw_model(2, WHITGL_SHADER_EXTRA_1, model_matrix, view, persp);
-}
-    
 static void draw_wall(int type, whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_fvec wall_offset = {tile_tex_offset[type][0], tile_tex_offset[type][1]};
     whitgl_fvec wall_size = {64, 64};
@@ -673,28 +217,6 @@ static void draw_overlay(int cur_loop, int cur_note) {
     }*/
 }
 
-static void draw_notes(note_t *beat, int cur_note, float time_since_note, int x) {
-    int total_notes = NOTES_PER_MEASURE * MEASURES_PER_LOOP;
-    int earliest_idx = NOTES_PER_MEASURE / 2;
-    int latest_idx = -NOTES_PER_MEASURE / 8;
-    for (int i = latest_idx; i < earliest_idx; i++) {
-        int note_idx = _mod(cur_note + i, total_notes);
-        note_t *note = &beat[note_idx];
-        if (note->exists && !note->popped) {
-            whitgl_ivec pos = get_note_pos(note->channel, i, earliest_idx, latest_idx);
-            pos.x = x;
-            note->pos = pos;
-            anim_obj *anim = note->anim;
-            //whitgl_sys_draw_sprite(anim->sprite, anim->frametr, note->pos);
-            whitgl_iaabb note_iaabb = {note->pos, {note->pos.x + 16, note->pos.y + 16}};
-            whitgl_sys_color fill = {0, 0, 255, 255};
-            whitgl_sys_color outline = {255, 255, 255, 255};
-            whitgl_sys_draw_iaabb(note_iaabb, fill);
-            whitgl_sys_draw_hollow_iaabb(note_iaabb, 1, outline);
-        }
-    }
-}
-
 static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat projection) {
     float objx = pos.x;
     float objy = pos.y;
@@ -733,9 +255,11 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
 
 static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_note, whitgl_fmat view, whitgl_fmat persp) {
     if (targeted_rat != -1) {
-        note_t *beat = rats[targeted_rat]->beat;
+        rat_t *target = rat_get(targeted_rat);
+        note_t *beat = target->beat;
         whitgl_fvec3 model_pos = {0.0f, 0.0f, 0.0f};
-        whitgl_fvec3 pos = {rats[targeted_rat]->phys->pos.x, rats[targeted_rat]->phys->pos.y, 0.5f};
+        physics_obj *phys = target->phys;
+        whitgl_fvec3 pos = {phys->pos.x, phys->pos.y, 0.5f};
         whitgl_fmat mv = whitgl_fmat_multiply(view, whitgl_fmat_translate(pos));
         whitgl_ivec window_coords = point_project(model_pos, mv, persp);
 
@@ -757,7 +281,7 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
         //whitgl_sys_draw_line(line4, border);
         draw_notes(beat, cur_note, time_since_note, pixel_x - 8);
 
-        whitgl_ivec target_pos = note_pop_pos;
+        whitgl_ivec target_pos = crosshair_pos;
         target_pos.x = pixel_x - 8;
         whitgl_sprite sprite = {0, {128,64+16*2},{16,16}};
         whitgl_ivec frametr = {0, 0};
@@ -774,8 +298,8 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
 static void draw_note_pop_text() {
     if (note_pop_text.exists) {
         int str_len = strlen("BASED");
-        int x = note_pop_pos.x - str_len * FONT_CHAR_W;
-        int y = note_pop_pos.y + 8 + 20.0f * (note_pop_text.life);
+        int x = crosshair_pos.x - str_len * FONT_CHAR_W;
+        int y = crosshair_pos.y + 8 + 20.0f * (note_pop_text.life);
         whitgl_iaabb iaabb = {{x, y - 12}, {x + str_len * 6, y}};
         whitgl_sys_color col = {0, 0, 0, 255};
         whitgl_sys_draw_iaabb(iaabb, col);
@@ -785,25 +309,11 @@ static void draw_note_pop_text() {
         whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
     }
 }
-            
 
-static void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            whitgl_fvec rat_offset = {128 + 64 * rats[i]->anim->frametr.x, 0};
-            whitgl_fvec rat_size = {64, 64};
-            whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 2, rat_offset);
-            whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 3, rat_size);
-            whitgl_fvec3 pos = {rats[i]->phys->pos.x, rats[i]->phys->pos.y, 0.5f};
-            draw_billboard(pos, view, persp);
-        }
-    }
-}
-
-static void draw_floors(struct point2 *player_pos, whitgl_fmat view, whitgl_fmat persp) {
+static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat persp) {
     for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
         for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
-            if (map_get(&map, x, y) == 0) {
+            if (MAP_GET(&map, x, y) == 0) {
                 whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 1.0f};
                 draw_floor(pos, view, persp);
             }
@@ -811,20 +321,16 @@ static void draw_floors(struct point2 *player_pos, whitgl_fmat view, whitgl_fmat
     }
 }
 
-static void raycast(struct point2 *position, double angle, whitgl_fmat view, whitgl_fmat persp)
+static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitgl_fmat persp)
 {
     int n_drawn = 0;
+    bool *drawn = (bool*)malloc(sizeof(bool) * map.w * map.h);
+    memset(drawn, false, sizeof(bool) * map.w * map.h);
     double fov = whitgl_pi / 2 * (double)SCREEN_W/(double)SCREEN_H;
     double ray_step = fov / (double) SCREEN_W;
 
-    for (int x = 0; x < MAP_WIDTH; x++) {
-        for (int y = 0; y < MAP_HEIGHT; y++) {
-            drawn[x][y] = 0;
-        }
-    }
-
     for (int i = 0; i < (SCREEN_W); i++) {
-        struct vector2 ray_direction;
+        whitgl_fvec ray_direction;
         double next_x, next_y;
         double step_x, step_y;
         double max_x, max_y;
@@ -863,7 +369,7 @@ static void raycast(struct point2 *position, double angle, whitgl_fmat view, whi
 
         bool draw = false;
         for (;;) {
-            if (map_get(&map, x, y) != 0) {
+            if (MAP_GET(&map, x, y) != 0) {
                 draw = true;
                 break;
             }
@@ -880,13 +386,15 @@ static void raycast(struct point2 *position, double angle, whitgl_fmat view, whi
                 }
             }
         }
-        if (draw && !drawn[x][y]) {
+        if (!drawn[y * map.h + x] && draw) {
             whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(map_get(&map, x, y), pos, view, persp);
-            drawn[x][y] = 1;
+            draw_wall(MAP_GET(&map, x, y), pos, view, persp);
             n_drawn++;
+            drawn[y * map.h + x] = true;
         }
     }
+    free(drawn);
+    //WHITGL_LOG("n_drawn: %d", n_drawn);
 }
 
 
@@ -906,8 +414,6 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     //model_matrix = whitgl_fmat_multiply(model_matrix, whitgl_fmat_rot_z(time*3));
 
     //whitgl_sys_draw_model(0, WHITGL_SHADER_MODEL, model_matrix, view, perspective);
-    player->phys->pos.x = camera_pos.x;
-    player->phys->pos.y = camera_pos.y;
     whitgl_fvec3 skybox_pos = camera_pos;
     skybox_pos.z = -2.5f;
     //draw_skybox(skybox_pos, view, perspective);
@@ -923,137 +429,29 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     draw_note_pop_text();
     draw_overlay(cur_loop, cur_note);
 
+    // draw hurt overlay if needed
+    int red_amt = player->damage_severity * 128;
+    whitgl_sys_color c = {red_amt, 0, 0, 0};
+    whitgl_set_shader_color(WHITGL_SHADER_POST, 0, c);
+
     whitgl_sys_draw_finish();
 }
 
-static bool move_toward_point(physics_obj *obj, point2 *target, double speed, double thresh) {
-    if(fabs(target->x - obj->pos.x) <= thresh && fabs(target->y - obj->pos.y) <= thresh) {
-        obj->vel.x = 0.0;
-        obj->vel.y = 0.0;
-        return true;
-    }
-    vector2 dir;
-    dir.x = target->x - obj->pos.x;
-    dir.y = target->y - obj->pos.y;
-    double norm = sqrt(pow(dir.x, 2) + pow(dir.y, 2));
-    norm = (norm == 0.0 ? 0.0 : 1.0 / norm);
-    obj->vel.x = dir.x * norm * speed;
-    obj->vel.y = dir.y * norm * speed;
-    return false;
-}
-
-bool line_of_sight_exists(point2 *p1, point2 *p2) {
-    struct vector2 ray_direction;
-    double next_x, next_y;
-    double step_x, step_y;
-    double max_x, max_y;
-    double ray_angle;
-    double dx, dy;
-    int x, y;
-
-    ray_direction.x = p2->x - p1->x;
-    ray_direction.y = p2->y - p1->y;
-    double norm = sqrt(pow(ray_direction.x, 2)+pow(ray_direction.y, 2));
-    ray_direction.x /= norm;
-    ray_direction.y /= norm;
-
-    x = p1->x;
-    y = p1->y;
-
-    step_x = _sign(ray_direction.x);
-    step_y = _sign(ray_direction.y);
-
-    next_x = x + (step_x > 0 ? 1 : 0);
-    next_y = y + (step_y > 0 ? 1 : 0);
-
-    max_x = (next_x - p1->x) / ray_direction.x;
-    max_y = (next_y - p1->y) / ray_direction.y;
-
-    if (isnan(max_x))
-            max_x = INFINITY;
-    if (isnan(max_y))
-            max_y = INFINITY;
-
-    dx = step_x / ray_direction.x;
-    dy = step_y / ray_direction.y;
-
-    if (isnan(dx))
-            dx = INFINITY;
-    if (isnan(dy))
-            dy = INFINITY;
-
-    while(x != (int)p2->x || y != (int)p2->y) {
-            if (map_get(&map, x, y) != 0) {
-                return false;
-            }
-
-            if (max_x < max_y) {
-                    max_x += dx;
-                    x += step_x;
-            } else {
-                    if(max_y < MAX_DIST) {
-                        max_y += dy;
-                        y += step_y;
-                    } else {
-                        break;
-                    }
-            }
-    }
-    return true;
-}
-
-bool unobstructed(point2 *p1, point2 *p2, double w) {
-    //if(fabs(p1->x - p2->x) < 1.0 && fabs(p1->y - p2->y) < 1.0)
-    //   return true;
-    double dx = p2->x - p1->x;
-    double dy = p2->y - p1->y;
-    double norm = sqrt(pow(dx, 2)+pow(dy, 2));
-    dx /= norm;
-    dy /= norm;
-    point2 p11 = {p1->x - dy * w, p1->y + dx * w};
-    point2 p21 = {p2->x - dy * w, p2->y + dx * w};
-    point2 p12 = {p1->x + dy * w, p1->y - dx * w};
-    point2 p22 = {p2->x + dy * w, p2->y - dx * w};
-    return line_of_sight_exists(&p11, &p21) && line_of_sight_exists(&p12, &p22);
-}
 
 void player_deal_damage(player_t *p, int dmg) {
-    p->time_since_damaged = 0.0f;
+    p->damage_severity = 1.0f;
     p->health = MAX(0, p->health - dmg);
-}
-
-void rat_deal_damage(rat_t *rat, int dmg) {
-    rat->health = MAX(0, rat->health - dmg);
-    if (rat->health == 0) {
-        rat->dead = true;
-    }
-}
-
-void rats_prune() {
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i] && rats[i]->dead) {
-            rat_destroy(rats[i]);
-        }
-    }
-}
-
-static void phys_update(float dt) {
-    for(int i = 0; i < MAX_N_PHYS; i++) {
-        if (phys_objs[i]) {
-            phys_obj_update(phys_objs[i], dt);
-        }
-    }
 }
 
 static bool player_update(player_t *p, float dt)
 {
     p->look_direction.x = cos(p->angle);
     p->look_direction.y = sin(p->angle);
-    vector2 world_move_dir;
+    whitgl_fvec world_move_dir;
     world_move_dir.x = (p->look_direction.x*p->move_direction.x + p->look_direction.y*p->move_direction.y);
     world_move_dir.y = (p->look_direction.y*p->move_direction.x - p->look_direction.x*p->move_direction.y);
-    set_vel(p->phys, &world_move_dir, MOVE_SPEED);
-    p->time_since_damaged += dt;
+    set_vel(p->phys, world_move_dir, MOVE_SPEED);
+    p->damage_severity = MAX(0.0f, p->damage_severity - dt);
     return p->health != 0;
 }
 
@@ -1079,80 +477,6 @@ static void note_pop_text_update(float dt) {
                 note_pop_text.exists = false;
             }
         }
-}
-
-static void anim_objs_update() {
-    for (int i = 0; i < MAX_N_ANIM_OBJS; i++) {
-        if (anim_objs[i]) {
-            int n_frames = anim_objs[i]->n_frames[anim_objs[i]->frametr.y];
-            int cur_frame = anim_objs[i]->frametr.x;
-            if (n_frames > 1) {
-                    cur_frame = anim_objs[i]->loop ? (cur_frame + 1) % n_frames : MIN(cur_frame + 1, n_frames - 1);
-            }
-            anim_objs[i]->frametr.x = cur_frame;
-        }
-    }
-}
-
-static void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_astar) {
-    for(int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            bool line_of_sight = unobstructed(&rats[i]->phys->pos, &p->phys->pos, rats[i]->phys->radius);
-            // Deal damage if close enough
-            if (line_of_sight && pow(rats[i]->phys->pos.x - p->phys->pos.x, 2) + pow(rats[i]->phys->pos.y - p->phys->pos.y, 2) <= pow(RAT_ATTACK_RADIUS, 2) && cur_note % RAT_ATTACK_NOTES == 0) {
-                p->time_since_damaged = 0.0f;
-                player_deal_damage(p, RAT_DAMAGE);
-            }
-            if(!line_of_sight && use_astar && diag_distance(p->phys->pos, rats[i]->phys->pos) < 20.0) {
-                ipoint2 start = {(int)(rats[i]->phys->pos.x), (int)(rats[i]->phys->pos.y)};
-                ipoint2 end = {(int)(p->phys->pos.x), (int)(p->phys->pos.y)};
-                rats[i]->path = astar(start, end);
-                if (rats[i]->path) {
-                    astar_node_t *start_node = pop_front(&rats[i]->path);
-                    free(start_node);
-                }
-            }
-            if(!line_of_sight && rats[i]->path) {
-                astar_node_t *next_node = (astar_node_t*)rats[i]->path->data;
-                point2 target = {(double)next_node->pt.x + 0.5, (double)next_node->pt.y + 0.5};
-                bool reached = move_toward_point(rats[i]->phys, &target, RAT_SPEED, 0.1);
-                if(reached) {
-                    astar_node_t *reached_node = pop_front(&rats[i]->path);
-                    free(reached_node);
-                }
-            } else if(line_of_sight) {
-                rats[i]->path = NULL;
-                point2 target;
-                target.x = p->phys->pos.x - (p->phys->pos.x - rats[i]->phys->pos.x) * 0.5;
-                target.y = p->phys->pos.y - (p->phys->pos.y - rats[i]->phys->pos.y) * 0.5;
-                move_toward_point(rats[i]->phys, &target, RAT_SPEED, 0.25);
-            }
-        }
-    }
-}
-
-static int get_closest_targeted_rat(point2 player_pos, vector2 player_look) {
-    int closest_hit_rat = -1;
-    float closest_dist_sq = 0.0f;
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            whitgl_fvec3 d = { rats[i]->phys->pos.x - player_pos.x,
-                rats[i]->phys->pos.y - player_pos.y, 0.0f };
-            whitgl_fvec3 l = { player_look.x, player_look.y, 0.0f };
-            whitgl_fvec3 cross = whitgl_fvec3_cross(l, d);
-            float sinsq = (cross.z * cross.z) / (d.x * d.x + d.y * d.y);
-            float max_sinsq = RAT_HITBOX_RADIUS * RAT_HITBOX_RADIUS / (RAT_HITBOX_RADIUS * RAT_HITBOX_RADIUS + d.x*d.x + d.y*d.y);
-            //WHITGL_LOG("sinsq: %f\tmax_sinsq: %f\tline_of_sight: %d", sinsq, max_sinsq, line_of_sight_exists(&player->phys->pos, &rats[i]->phys->pos));
-            if (sinsq < max_sinsq && line_of_sight_exists(&player->phys->pos, &rats[i]->phys->pos)) {
-                float dist_sq = d.x * d.x + d.y * d.y;
-                if (dist_sq < closest_dist_sq || closest_hit_rat == -1) {
-                    closest_hit_rat = i;
-                    closest_dist_sq = dist_sq;
-                }
-            }
-        }
-    }
-    return closest_hit_rat;
 }
 
 void game_load_level(char *levelname, map_t *map) {
@@ -1197,7 +521,7 @@ void game_input()
 {
     player_t *p = player;
 
-    vector2 move_dir = {0.0, 0.0};
+    whitgl_fvec move_dir = {0.0, 0.0};
     if(whitgl_input_held(WHITGL_INPUT_UP))
         move_dir.x += 1.0;
     if(whitgl_input_held(WHITGL_INPUT_DOWN))
@@ -1216,7 +540,7 @@ void game_input()
         if (p->targeted_rat != -1) {
             int best_candidate = NOTES_PER_MEASURE/8+1;
             int best_idx = -1;
-            note_t *beat = rats[p->targeted_rat]->beat;
+            note_t *beat = rat_get(p->targeted_rat)->beat;
             for (int i = -NOTES_PER_MEASURE/8; i < NOTES_PER_MEASURE/8; i++) {
                 int note_idx = _mod(cur_note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
                 if (beat[note_idx].exists && !beat[note_idx].popped && abs(i) < best_candidate) {
@@ -1238,7 +562,7 @@ void game_input()
                 } else {
                     set_note_pop_text("BASED");
                 }
-                rat_deal_damage(rats[p->targeted_rat], (int)(4.0f * acc));
+                rat_deal_damage(rat_get(p->targeted_rat), (int)(4.0f * acc));
             }
         }
     }
@@ -1255,18 +579,18 @@ void game_init() {
 
     game_load_level("data/lvl/lvl1.png", &map);
 
-    point2 p_pos = {1.5, 2};
+    whitgl_fvec p_pos = {1.5, 2};
     player_create(&p_pos, 0.0);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
-            if (rand() % 150 == 0 && map_get(&map, x, y) == 0) {
-                point2 rat_pos = {x + 0.5f, y + 0.5f};
+            if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
+                whitgl_fvec rat_pos = {x + 0.5f, y + 0.5f};
                 rat_create(&rat_pos);
-                break;
+                goto done;
             }
         }
     }
-
+done:
 
     cycles_to_astar = 0;
     actual_song_millis = 0;
@@ -1276,13 +600,9 @@ void game_init() {
 }
 
 void game_cleanup() {
+    rats_destroy_all(player);
     player_destroy();
     game_free_level(&map);
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if (!rats[i]) {
-            rat_destroy(rats[i]);
-        }
-    }
 }
 
 void game_start() {
@@ -1330,15 +650,15 @@ int game_update(float dt) {
     time_since_note = _fmod(song_time, secs_per_note);
     player_update(player, dt);
     if(cycles_to_astar == 0) {
-        rats_update(player, dt, cur_note, true);
+        rats_update(player, dt, cur_note, true, &map);
         cycles_to_astar = 100;
     } else {
-        rats_update(player, dt, cur_note, false);
+        rats_update(player, dt, cur_note, false, &map);
         cycles_to_astar--;
     }
-    phys_update(dt);
+    phys_update(&map, dt);
 
-    rats_prune();
+    rats_prune(player);
 
     return 0;
 }
