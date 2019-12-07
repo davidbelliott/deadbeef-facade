@@ -30,7 +30,7 @@ rat_t* rat_create(whitgl_fvec *pos) {
             rat->dead = false;
 
             for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
-                note_create(&rat->beat[j], rand() % 2 == 0 && j % 16 == 0);
+                note_create(&rat->beat[j], rand() % 2 == 0 && j % 8 == 0);
             }
             rats[rat->id] = rat;
             break;
@@ -219,6 +219,24 @@ int get_closest_targeted_rat(whitgl_fvec player_pos, whitgl_fvec player_look, ma
         }
     }
     return closest_hit_rat;
+}
+
+int get_closest_visible_rat(whitgl_fvec player_pos, map_t *map) {
+    int closest_visible_rat = -1;
+    float closest_dist_sq = 0.0f;
+    for (int i = 0; i < MAX_N_RATS; i++) {
+        if (rats[i]) {
+            whitgl_fvec d = whitgl_fvec_sub(rats[i]->phys->pos, player_pos);
+            if (line_of_sight_exists(player_pos, rats[i]->phys->pos, map)) {
+                float dist_sq = whitgl_fvec_sqmagnitude(d);
+                if (dist_sq < closest_dist_sq || closest_visible_rat == -1) {
+                    closest_visible_rat = i;
+                    closest_dist_sq = dist_sq;
+                }
+            }
+        }
+    }
+    return closest_visible_rat;
 }
 
 void rats_destroy_all(player_t *p) {

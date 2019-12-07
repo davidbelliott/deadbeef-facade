@@ -195,11 +195,22 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
 }
 
 static void draw_overlay(int cur_loop, int cur_note) {
-    whitgl_iaabb iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
+    whitgl_sys_color top_col = {0, 0, 128, 255};
+
+    whitgl_iaabb top_iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
+    char path[256] = "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: 60]";
+    draw_window(path, top_iaabb, top_col);
+
+
+
     whitgl_sys_color col = {0, 0, 255, 255};
+    whitgl_iaabb bottom_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W, SCREEN_H}};
+    whitgl_iaabb health_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
+    whitgl_sys_color black = {0, 0, 0, 255};
     char health[256];
     snprintf(health, 256, "HEALTH: %d", player->health);
-    draw_window(health, iaabb, col);
+    whitgl_sys_draw_iaabb(bottom_iaabb, black);
+    draw_window(health, health_iaabb, col);
 
     /*whitgl_sys_color fill = {0, 0, 0, 255};
     whitgl_sys_color border = {255, 255, 255, 255};
@@ -264,6 +275,7 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
     window_coord.y=(fTempo[5]*0.5+0.5)*SCREEN_H;
     // This is only correct when glDepthRange(0.0, 1.0)
     //windowCoordinate[2]=(1.0+fTempo[6])*0.5;	// Between 0 and 1
+    WHITGL_LOG("window coord: %d, %d", window_coord.x, window_coord.y);
     return window_coord;
 }
 
@@ -276,9 +288,14 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
         whitgl_fvec3 pos = {phys->pos.x, phys->pos.y, 0.5f};
         whitgl_fmat mv = whitgl_fmat_multiply(view, whitgl_fmat_translate(pos));
         whitgl_ivec window_coords = point_project(model_pos, mv, persp);
-
-        printf("%d\t%d\n", window_coords.x, window_coords.y);
-
+        if (whitgl_fvec_dot(player->look_direction, whitgl_fvec_sub(phys->pos, player->phys->pos)) < 0) {
+            window_coords.x = window_coords.x >= SCREEN_W / 2 ? 8 : SCREEN_W - 8;
+        }
+        if (window_coords.x < 8) {
+            window_coords.x = 8;
+        } else if (window_coords.x > SCREEN_W - 8) {
+            window_coords.x = SCREEN_W - 8;
+        }
 
         whitgl_sys_color fill = {0, 0, 0, 255};
         whitgl_sys_color border = {255, 255, 255, 255};
@@ -466,6 +483,11 @@ static int player_update(player_t *p, float dt)
     world_move_dir.y = (p->look_direction.y*p->move_direction.x - p->look_direction.x*p->move_direction.y);
     set_vel(p->phys, world_move_dir, MOVE_SPEED);
     p->damage_severity = MAX(0.0f, p->damage_severity - dt);
+    
+    // Target if no rat targeted
+    if (p->targeted_rat == -1) {
+        p->targeted_rat = get_closest_visible_rat(p->phys->pos, &map);
+    }
 
     // Test for portals, doors, etc
     if (MAP_GET(&map, (int)p->phys->pos.x, (int)p->phys->pos.y) == TILE_TYPE_PORTAL) {
@@ -525,7 +547,10 @@ void game_input()
     player->move_direction = move_dir;
 
     if (whitgl_input_pressed(WHITGL_INPUT_A)) {
-        player->targeted_rat = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
+        int targeted = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
+        if (targeted != -1) {
+            player->targeted_rat = targeted;
+        }
     }
     
     if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT)) {
@@ -542,7 +567,7 @@ void game_input()
             }
             if (best_idx != -1) {
                 float acc = 1.0f - (float)best_candidate / (float)(NOTES_PER_MEASURE / 8);
-                beat[best_idx].popped = true;
+                //beat[best_idx].popped = true;
                 //beat[best_idx].anim->frametr.x = 0;
                 //beat[best_idx].anim->frametr.y = 1;
                 if (acc <= 0.25f) {
@@ -579,11 +604,9 @@ void game_init() {
             if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
                 whitgl_fvec rat_pos = {x + 0.5f, y + 0.5f};
                 rat_create(&rat_pos);
-                goto done;
             }
         }
     }
-done:
 
     cycles_to_astar = 0;
     actual_song_millis = 0;

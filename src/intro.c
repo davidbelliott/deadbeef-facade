@@ -14,7 +14,7 @@
 
 #define PER_CHAR_DELAY 0.02f
 
-char text[] = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nisl erat, tempor at aliquam a, molestie eget nulla. Duis consequat dui vitae suscipit elementum. Proin in pharetra nunc. Vivamus commodo sapien velit, eleifend rutrum tortor consequat vitae. Curabitur eu venenatis nibh. Cras sagittis ac nisl interdum pharetra. Nunc quis lacus mi. Nulla eget sapien non lorem pulvinar mollis at id diam. Phasellus et tortor a lacus malesuada ullamcorper nec et felis. Suspendisse ultricies, augue sed pharetra facilisis, sem augue lobortis ante, et lobortis ipsum diam in augue. Pellentesque aliquam feugiat imperdiet. Nam imperdiet arcu eget tellus tempor iaculis. In ac nulla enim. Proin posuere massa lectus, vel lobortis tellus tempor finibus. Nam in arcu laoreet, elementum massa non, aliquam urna. Integer at purus iaculis, ornare risus ut, fringilla tellus.\n\nMauris egestas eros quis mauris cursus ultricies. Nulla posuere mauris eget dui feugiat accumsan. Nam pulvinar, libero sed aliquet dignissim, mi ipsum rutrum elit, id malesuada diam ex eu orci. Fusce eu velit leo. Aliquam finibus a magna vel consectetur. Duis sagittis cursus fringilla. Ut fermentum quam id tempus auctor. Praesent elit enim, pellentesque a mi vel, semper cursus orci. Curabitur iaculis lobortis viverra. Suspendisse consectetur tortor sit amet neque suscipit, ac aliquam mauris egestas. In hac habitasse platea dictumst. Maecenas venenatis odio quis eros interdum, id semper libero rutrum.";
+char text[] = "Sometimes a man gets mogged so hard he forgets to breathe. When life gives you a moment, you have to live in the moment. You're not Lindy, hunched by your bed typing into Vim. A man's fucked up on dark mode solarized cool command line life hacks, even though dark mode's for pussies. Is a man meant to live life staring into a dark grotto, or with his eyes trained on the bright savanna horizon scanning for prey?\n\nA man's gotta make a monument, a monument more lasting than bronze. A man dreams of saying on his deathbed, \"I knew I had it in me all along.\" How bitter it will be to admit you were wrong.";
 
 char path_str[] = "data/lvl/lvl1.json";
 
@@ -131,21 +131,23 @@ void intro_frame() {
     whitgl_sys_draw_init(0);
     whitgl_sys_enable_depth(false);
 
+    whitgl_sys_color col = {0, 0, 255, 255};
+    whitgl_iaabb outer_box = {{0, 0}, {SCREEN_W, SCREEN_H}};
+    draw_window("", outer_box, col);
 
     whitgl_iaabb iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
-    whitgl_sys_color col = {0, 0, 255, 255};
+    whitgl_sys_color black = {0, 0, 0, 255};
     char path[256];
     snprintf(path, 256, "PATH: %s", path_str);
     draw_window(path, iaabb, col);
 
-    whitgl_sprite sprite = {1, {0,0},{128,128}};
+    whitgl_sprite sprite = {1, {0,0},{256,256}};
     whitgl_ivec frametr = {0, 0};
-    whitgl_ivec pos = {SCREEN_W - 128, FONT_CHAR_H};
+    whitgl_ivec pos = {SCREEN_W - 255 - FONT_CHAR_W, FONT_CHAR_H};
     whitgl_sys_draw_sprite(sprite, frametr, pos);
 
-
-
-    whitgl_iaabb bounding_box = {{FONT_CHAR_W, FONT_CHAR_H}, {SCREEN_W - FONT_CHAR_W - 128, SCREEN_H - FONT_CHAR_H}};
+    whitgl_iaabb bounding_box = {{FONT_CHAR_W, FONT_CHAR_H}, {SCREEN_W - 2 * FONT_CHAR_W - 256, SCREEN_H - FONT_CHAR_H}};
+    draw_window("", bounding_box, black);
     int wrapped_len = strlen(text) + SCREEN_H / FONT_CHAR_H;    // strlen + max_newlines + 1
     char *wrapped_text = (char*)malloc(wrapped_len);
     wrap_text(text, wrapped_text, wrapped_len, bounding_box);

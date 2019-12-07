@@ -25,6 +25,7 @@ rat_t* rat_create(whitgl_fvec *pos);
 void rat_destroy(rat_t *rat, player_t *p);
 void rat_deal_damage(rat_t *rat, int dmg);
 int get_closest_targeted_rat(whitgl_fvec player_pos, whitgl_fvec player_look, map_t *map);
+int get_closest_visible_rat(whitgl_fvec player_pos, map_t *map);
 void rats_prune(player_t *p);
 void draw_rats(whitgl_fmat view, whitgl_fmat persp);
 void rats_update(player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map);

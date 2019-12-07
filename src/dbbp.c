@@ -303,6 +303,8 @@ int main(int argc, char* argv[])
 
         bool running = true;
         whitgl_sys_add_image(0, "data/tex/tex.png");
+        whitgl_set_shader_image(WHITGL_SHADER_EXTRA_0, 0, 0);
+        whitgl_set_shader_image(WHITGL_SHADER_EXTRA_1, 0, 0);
 
         whitgl_ivec spritesheet_size = whitgl_sys_get_image_size(0);
         whitgl_fvec fspritesheet_size;
