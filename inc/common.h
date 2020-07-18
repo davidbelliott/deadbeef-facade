@@ -85,9 +85,9 @@ enum {
 #define TILE_TYPE_STONE     3
 #define TILE_TYPE_PORTAL    4
 
-int tile_lvl_rgb[N_TILE_TYPES][4];
-int tile_tex_offset[N_TILE_TYPES][2];
-bool tile_walkable[N_TILE_TYPES];
+extern int tile_lvl_rgb[N_TILE_TYPES][4];
+extern int tile_tex_offset[N_TILE_TYPES][2];
+extern bool tile_walkable[N_TILE_TYPES];
 
 #endif
 

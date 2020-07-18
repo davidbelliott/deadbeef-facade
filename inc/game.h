@@ -1,15 +1,20 @@
 #ifndef GAME_H
 #define GAME_H
 
+#define PLAYER_ANGLE_PI_FRAC 128
+
 #include "physics.h"
 
 #include <stdbool.h>
 
 typedef struct player_t {
     physics_obj *phys;
-    double angle;
+    int angle;
+    int look_angle;
+    whitgl_float move_dir;
     whitgl_fvec look_direction;
     whitgl_fvec move_direction;
+    int last_rotate_dir;
     int health;
     float damage_severity;
     int targeted_rat;

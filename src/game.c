@@ -76,15 +76,18 @@ static void player_destroy() {
     player = NULL;
 }
 
-static void player_create(whitgl_fvec *pos, double angle) {
+static void player_create(whitgl_fvec *pos, unsigned int angle) {
     if(player)
         player_destroy();
     player = (player_t*)malloc(sizeof(player_t));
     whitgl_fvec zero = {0.0, 0.0};
     player->phys = phys_create(pos, &zero, 0.2);
     player->angle = angle;
+    player->look_angle = angle;
     player->look_direction = zero;
     player->move_direction = zero;
+    player->move_dir = 0.0f;
+    player->last_rotate_dir = 1;
     player->health = 100;
     player->damage_severity = 0.0f;
     player->targeted_rat = -1;
@@ -279,6 +282,22 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
     return window_coord;
 }
 
+static void draw_note_pop_text(whitgl_ivec pos) {
+    if (note_pop_text.exists) {
+        int str_len = strlen("BASED");
+        int x = pos.x - str_len * FONT_CHAR_W;
+        int y = pos.y + 8 + 20.0f * (note_pop_text.life);
+        whitgl_iaabb iaabb = {{x, y - FONT_CHAR_H}, {x + str_len * FONT_CHAR_W, y}};
+        whitgl_sys_color col = {0, 0, 0, 255};
+        whitgl_sys_draw_iaabb(iaabb, col);
+
+        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
+        whitgl_ivec text_pos = { x, y - FONT_CHAR_H};
+        whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
+    }
+}
+
+
 static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_note, whitgl_fmat view, whitgl_fmat persp) {
     if (targeted_rat != -1) {
         rat_t *target = rat_get(targeted_rat);
@@ -317,6 +336,8 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
         whitgl_sprite sprite = {0, {128,64+16*2},{16,16}};
         whitgl_ivec frametr = {0, 0};
         whitgl_sys_draw_sprite(sprite, frametr, target_pos);
+
+        draw_note_pop_text(target_pos);
     }
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
     whitgl_iaabb box1 = {{crosshairs_pos.x - 1, crosshairs_pos.y - 4}, {crosshairs_pos.x + 1, crosshairs_pos.y + 4}};
@@ -324,21 +345,6 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
     whitgl_sys_color border = {255, 255, 255, 255};
     whitgl_sys_draw_iaabb(box1, border);
     whitgl_sys_draw_iaabb(box2, border);
-}
-
-static void draw_note_pop_text() {
-    if (note_pop_text.exists) {
-        int str_len = strlen("BASED");
-        int x = crosshair_pos.x - str_len * FONT_CHAR_W;
-        int y = crosshair_pos.y + 8 + 20.0f * (note_pop_text.life);
-        whitgl_iaabb iaabb = {{x, y - 12}, {x + str_len * 6, y}};
-        whitgl_sys_color col = {0, 0, 0, 255};
-        whitgl_sys_draw_iaabb(iaabb, col);
-
-        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-        whitgl_ivec text_pos = { x, y - 12};
-        whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
-    }
 }
 
 static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat persp) {
@@ -431,12 +437,22 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
 
 static void frame(player_t *p, int cur_loop, int cur_note)
 {
+    printf("%f\t%f\n", p->look_angle, p->angle);
+    if (p->angle != p->look_angle && p->last_rotate_dir == 1) {
+        p->look_angle = (p->look_angle + 4) % 256;
+    } else if (p->angle != p->look_angle) {
+        p->look_angle = (p->look_angle - 4) % 256;
+    }
+
+
+
     whitgl_sys_draw_init(0);
 
     whitgl_sys_enable_depth(true);
 
     whitgl_float fov = whitgl_pi/2;
     whitgl_fmat perspective = whitgl_fmat_perspective(fov, (float)SCREEN_W/(float)SCREEN_H, 0.1f, 100.0f);
+    //whitgl_fmat perspective = whitgl_fmat_orthographic(-5.0f, 5.0f, 5.0f, -5.0f, -5.0f, 5.0f);
     whitgl_fvec3 up = {0,0,-1};
     whitgl_fvec3 camera_pos = {player->phys->pos.x,player->phys->pos.y,0.5f};
     whitgl_fvec3 camera_to = {camera_pos.x + player->look_direction.x, camera_pos.y + player->look_direction.y,0.5f};
@@ -448,7 +464,7 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     whitgl_fvec3 skybox_pos = camera_pos;
     skybox_pos.z = -2.5f;
     //draw_skybox(skybox_pos, view, perspective);
-    raycast(&player->phys->pos, p->angle, view, perspective);
+    raycast(&player->phys->pos, p->look_angle * whitgl_pi / 128.0f, view, perspective);
     draw_floors(&player->phys->pos, view, perspective);
     draw_rats(view, perspective);
 
@@ -457,7 +473,6 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     draw_rat_overlays(player->targeted_rat, cur_note, time_since_note, view, perspective);
 
     //draw_notes(cur_loop, cur_note, time_since_note);
-    draw_note_pop_text();
     draw_overlay(cur_loop, cur_note);
 
     // draw hurt overlay if needed
@@ -476,11 +491,13 @@ void player_deal_damage(player_t *p, int dmg) {
 
 static int player_update(player_t *p, float dt)
 {
-    p->look_direction.x = cos(p->angle);
-    p->look_direction.y = sin(p->angle);
+    p->look_direction.x = cos(p->look_angle * whitgl_pi / 128.0f);
+    p->look_direction.y = sin(p->look_angle * whitgl_pi / 128.0f);
+    p->move_direction.x = cos(p->angle * whitgl_pi / 128.0f);
+    p->move_direction.y = sin(p->angle * whitgl_pi / 128.0f);
     whitgl_fvec world_move_dir;
-    world_move_dir.x = (p->look_direction.x*p->move_direction.x + p->look_direction.y*p->move_direction.y);
-    world_move_dir.y = (p->look_direction.y*p->move_direction.x - p->look_direction.x*p->move_direction.y);
+    world_move_dir.x = (p->move_direction.x*p->move_dir);
+    world_move_dir.y = (p->move_direction.y*p->move_dir);
     set_vel(p->phys, world_move_dir, MOVE_SPEED);
     p->damage_severity = MAX(0.0f, p->damage_severity - dt);
     
@@ -535,16 +552,25 @@ void game_input()
 {
     player_t *p = player;
 
-    whitgl_fvec move_dir = {0.0, 0.0};
+    whitgl_float move = 0.0f;
     if(whitgl_input_held(WHITGL_INPUT_UP))
-        move_dir.x += 1.0;
+        move += 1.0;
     if(whitgl_input_held(WHITGL_INPUT_DOWN))
-        move_dir.x -= 1.0;
-    if(whitgl_input_held(WHITGL_INPUT_RIGHT))
+        move -= 1.0;
+    /*if(whitgl_input_held(WHITGL_INPUT_RIGHT))
         move_dir.y -= 1.0;
     if(whitgl_input_held(WHITGL_INPUT_LEFT))
-        move_dir.y += 1.0;
-    player->move_direction = move_dir;
+        move_dir.y += 1.0;*/
+    if (whitgl_input_pressed(WHITGL_INPUT_RIGHT)) {
+        p->angle = (p->angle + 64) % 256;
+        p->last_rotate_dir = +1;
+    }
+    if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
+        p->angle = (p->angle - 64) % 256;
+        p->last_rotate_dir = -1;
+    }
+
+    player->move_dir = move;
 
     if (whitgl_input_pressed(WHITGL_INPUT_A)) {
         int targeted = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
@@ -585,7 +611,7 @@ void game_input()
     }
 
     whitgl_ivec mouse_pos = whitgl_input_mouse_pos(PIXEL_DIM);
-    p->angle = mouse_pos.x * MOUSE_SENSITIVITY / (double)(SCREEN_W);
+    //p->angle = mouse_pos.x * MOUSE_SENSITIVITY / (double)(SCREEN_W);
 }
 
 void game_init() {
@@ -598,12 +624,12 @@ void game_init() {
     game_load_level("data/lvl/lvl1.png", &map);
 
     whitgl_fvec p_pos = {1.5, 2};
-    player_create(&p_pos, 0.0);
+    player_create(&p_pos, 0);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
             if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
                 whitgl_fvec rat_pos = {x + 0.5f, y + 0.5f};
-                rat_create(&rat_pos);
+                //rat_create(&rat_pos);
             }
         }
     }
@@ -623,7 +649,7 @@ void game_cleanup() {
 
 void game_start() {
     whitgl_loop_seek(AMBIENT_MUSIC, 0.0f);
-    whitgl_loop_set_paused(AMBIENT_MUSIC, false);
+    //whitgl_loop_set_paused(AMBIENT_MUSIC, false);
 }
 
 void game_stop() {
