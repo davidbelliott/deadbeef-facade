@@ -109,7 +109,6 @@ in vec2 Texturepos;\
 in vec3 fragmentNormal;\
 out vec4 outColor;\
 uniform sampler2D tex;\
-uniform float spread;\
 void main()\
 {\
         vec4 tex_color = texture2D(tex, Texturepos);\
@@ -135,11 +134,13 @@ in vec3 fragmentNormal;\
 out vec4 outColor;\
 uniform sampler2D tex;\
 uniform float spread;\
+uniform vec4 tint;\
 void main()\
 {\
         vec4 tex_color = texture2D(tex, Texturepos);\
         if (tex_color.rgb == vec3(1.0, 0.0, 1.0))\
             discard;\
+        tex_color += tint;\
         float fogDistance = gl_FragCoord.z / gl_FragCoord.w;\
         float fogAmount = fog_exp2(fogDistance, 0.15);\
         float shadeFactor = dot(fragmentNormal.xy, vec2(0.2, 0.2));\
@@ -251,7 +252,7 @@ int main(int argc, char* argv[])
         whitgl_shader tex_model_shader = whitgl_shader_zero;
         tex_model_shader.vertex_src = vertex_model_src;
         tex_model_shader.fragment_src = frag_src;
-        tex_model_shader.num_uniforms = 4;
+        tex_model_shader.num_uniforms = 6;
         tex_model_shader.uniforms[0].name = "tex";
         tex_model_shader.uniforms[0].type = WHITGL_UNIFORM_IMAGE;
         tex_model_shader.uniforms[1].name = "spritesheet_size";
@@ -260,6 +261,8 @@ int main(int argc, char* argv[])
         tex_model_shader.uniforms[2].type = WHITGL_UNIFORM_FVEC;
         tex_model_shader.uniforms[3].name = "sprite_size";
         tex_model_shader.uniforms[3].type = WHITGL_UNIFORM_FVEC;
+        tex_model_shader.uniforms[4].name = "tint";
+        tex_model_shader.uniforms[4].type = WHITGL_UNIFORM_COLOR;
         if (!whitgl_change_shader(WHITGL_SHADER_EXTRA_0, tex_model_shader))
             return 1;
 
@@ -323,14 +326,14 @@ int main(int argc, char* argv[])
         intro_init();
 
 
-        int game_state = GAME_STATE_INTRO;
+        int game_state = GAME_STATE_GAME;
         int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;
         whitgl_float dt = 0;
         bool paused = false;
 
-        intro_start();
+        game_start();
 
 	while (running) {
             whitgl_sound_update();

@@ -6,6 +6,7 @@
 #include "physics.h"
 
 #include <stdbool.h>
+#include <whitgl/sys.h>
 
 typedef struct player_t {
     whitgl_ivec pos;
@@ -13,12 +14,15 @@ typedef struct player_t {
     int angle;
     int look_angle;
     int move;
-    whitgl_fvec look_direction;
-    whitgl_fvec move_direction;
+    whitgl_fvec look_facing;
+    whitgl_ivec facing;
     int last_rotate_dir;
     int health;
-    float damage_severity;
+    int last_damage;
     int targeted_rat;
+    bool moved;
+    int move_time;
+    int move_goodness;
 } player_t;
 
 void player_deal_damage(player_t *p, int dmg);
@@ -33,5 +37,6 @@ int game_update(float dt);
 void game_input();
 void game_frame();
 void game_pause(bool paused);
+void notify(const char *str, whitgl_sys_color color);
 
 #endif

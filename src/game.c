@@ -23,6 +23,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+char notification[64];
+whitgl_sys_color notif_col;
+int notif_update_time;
+
+#define MOVE_NONE       0
+#define MOVE_FORWARD    1
+#define MOVE_BACKWARD   2
+#define MOVE_TURN_LEFT  3
+#define MOVE_TURN_RIGHT 4
+
 whitgl_ivec crosshair_pos = {SCREEN_W / 2 - 8, SCREEN_H / 2 - 8};
 
 typedef struct note_pop_text_t {
@@ -44,8 +54,7 @@ typedef struct loop_t {
 } loop_t;
 
 int earliest_active_note_offset = 0;
-int cur_loop = 0;
-int cur_note = 0;
+int note = 0;
 
 note_pop_text_t note_pop_text = { 0 };
 
@@ -81,18 +90,20 @@ static void player_create(whitgl_ivec pos, unsigned int angle) {
         player_destroy();
     player = (player_t*)malloc(sizeof(player_t));
     whitgl_fvec zero = {0.0, 0.0};
+    whitgl_ivec izero = {0, 0};
     player->pos = pos;
     player->look_pos.x = pos.x * 256;
     player->look_pos.y = pos.y * 256;
     player->angle = angle;
     player->look_angle = angle;
-    player->look_direction = zero;
-    player->move_direction = zero;
+    player->facing = izero;
+    player->look_facing = zero;
     player->move = 0;
     player->last_rotate_dir = 1;
     player->health = 100;
-    player->damage_severity = 0.0f;
+    player->last_damage = -256;
     player->targeted_rat = -1;
+    player->moved = false;
 }
 
 void game_load_level(char *levelname, map_t *map) {
@@ -123,6 +134,13 @@ void game_load_level(char *levelname, map_t *map) {
         }
         map->data[i] = tile;
     }
+}
+
+void notify(const char *str, whitgl_sys_color color) {
+    strncpy(notification, str, 63);
+    notification[63] = 0;
+    notif_update_time = note;
+    notif_col = color;
 }
 
 void game_free_level(map_t *map) {
@@ -199,16 +217,19 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_sys_draw_model(1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
-static void draw_overlay(int cur_loop, int cur_note) {
-    whitgl_sys_color top_col = {0, 0, 128, 255};
-
+static void draw_overlay(int cur_note) {
+    int most_recent_note = note % 8;
+    whitgl_sys_color fill_a = {0, 0, 128, 255};
+    whitgl_sys_color fill_b = {128, 0, 0, 255};
+    whitgl_sys_color top_col = most_recent_note < 2 ? fill_b : fill_a;
     whitgl_iaabb top_iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
     char path[256] = "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: 60]";
     draw_window(path, top_iaabb, top_col);
 
-
-
-    whitgl_sys_color col = {0, 0, 255, 255};
+    int elapsed = note - player->last_damage;
+    int blue_val = (elapsed < 8 ? 255.0 / (8.0 - elapsed) : 255);
+    int red_val = 255 - blue_val;
+    whitgl_sys_color col = {red_val, 0, blue_val, 255};
     whitgl_iaabb bottom_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W, SCREEN_H}};
     whitgl_iaabb health_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
     whitgl_sys_color black = {0, 0, 0, 255};
@@ -217,34 +238,13 @@ static void draw_overlay(int cur_loop, int cur_note) {
     whitgl_sys_draw_iaabb(bottom_iaabb, black);
     draw_window(health, health_iaabb, col);
 
-    /*whitgl_sys_color fill = {0, 0, 0, 255};
-    whitgl_sys_color border = {255, 255, 255, 255};
-    whitgl_iaabb zune_iaabb = {{8, 8}, {126, SCREEN_H - 8}};
-    draw_window("My Zune", zune_iaabb, fill, border);
-
-    int first_loop_shown = MIN(MAX(0, cur_loop - 2), NUM_LOOPS - 1 - 5);
-    for (int i = 0; i < 4; i++) {
-        int loop_idx = i + first_loop_shown;
-        whitgl_sys_color fill = {0, 0, 0, 0};
-        whitgl_sys_color outline = {0, 0, 0, 0};
-        if (loop_idx == cur_loop || !loop_active) {
-            int most_recent_note = 0;
-            int total_notes = NOTES_PER_MEASURE * MEASURES_PER_LOOP;
-            for ( ; most_recent_note < 16; most_recent_note ++) {
-                int note_idx = _mod(cur_note - most_recent_note, total_notes);
-                if (aloops[loop_idx].notes[note_idx].exists) {
-                    break;
-                }
-            }
-            whitgl_sys_color fill_active = {0, 0, (most_recent_note < 8 ? 255 * (8 - most_recent_note) / 8 : 0), 255};
-            whitgl_sys_color outline_active = {0, 255, 255, 255};
-            fill = fill_active;
-            outline = outline_active;
-        }
-        whitgl_iaabb loop_iaabb = {{zune_iaabb.a.x, zune_iaabb.a.y + (FONT_CHAR_H + 9) * (i + 1)},
-                                    {zune_iaabb.b.x, zune_iaabb.a.y + (FONT_CHAR_H + 9) * (i + 1) + FONT_CHAR_H + 9}};
-        draw_window(aloops[loop_idx].name, loop_iaabb, fill, outline);
-    }*/
+    if (note - notif_update_time < 8) {
+        int notif_width = FONT_CHAR_W * strlen(notification);
+        int top_y = SCREEN_H / 2 + (note - notif_update_time) * FONT_CHAR_H;
+        whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
+                     {SCREEN_W / 2 + notif_width / 2, top_y + FONT_CHAR_H}};
+        draw_window(notification, notif_iaabb, notif_col);
+    }
 }
 
 static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat projection) {
@@ -348,7 +348,11 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
     whitgl_sys_draw_iaabb(box2, border);
 }
 
+static void draw_sky() {
+}
+
 static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat persp) {
+
     for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
         for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
             if (MAP_GET(&map, x, y) == 0) {
@@ -436,10 +440,14 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
 }
 
 
-static void frame(player_t *p, int cur_loop, int cur_note)
+static void frame(player_t *p, int cur_note)
 {
     whitgl_fvec pov_pos = {(float)player->look_pos.x / 256.0f + 0.5f, (float)player->look_pos.y / 256.0f + 0.5f};
     whitgl_sys_draw_init(0);
+
+    whitgl_sys_enable_depth(false);
+
+    draw_sky();
 
     whitgl_sys_enable_depth(true);
 
@@ -448,7 +456,7 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     //whitgl_fmat perspective = whitgl_fmat_orthographic(-5.0f, 5.0f, 5.0f, -5.0f, -5.0f, 5.0f);
     whitgl_fvec3 up = {0,0,-1};
     whitgl_fvec3 camera_pos = {pov_pos.x, pov_pos.y, 0.5f};
-    whitgl_fvec3 camera_to = {camera_pos.x + player->look_direction.x, camera_pos.y + player->look_direction.y,0.5f};
+    whitgl_fvec3 camera_to = {camera_pos.x + player->look_facing.x, camera_pos.y + player->look_facing.y,0.5f};
     whitgl_fmat view = whitgl_fmat_lookAt(camera_pos, camera_to, up);
     //whitgl_fmat model_matrix = whitgl_fmat_translate(camera_to);
     //model_matrix = whitgl_fmat_multiply(model_matrix, whitgl_fmat_rot_z(time*3));
@@ -466,23 +474,46 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     draw_rat_overlays(player->targeted_rat, cur_note, time_since_note, view, perspective);
 
     //draw_notes(cur_loop, cur_note, time_since_note);
-    draw_overlay(cur_loop, cur_note);
+    draw_overlay(cur_note);
 
-    // draw hurt overlay if needed
-    int red_amt = player->damage_severity * 128;
-    whitgl_sys_color c = {red_amt, 0, 0, 0};
-    whitgl_set_shader_color(WHITGL_SHADER_POST, 0, c);
+    // draw move overlay if needed
+    int elapsed = note - player->move_time;
+    int color_amt = (elapsed < 4 ? (4 - elapsed) * 32 : 0);
+    whitgl_sys_color c = {0, 0, 0, 0};
+    switch (p->move_goodness) {
+        case 2:
+            c.g = color_amt;
+            break;
+        case 1:
+            c.g = color_amt;
+        case 0:
+            c.r = color_amt;
+        default:
+            break;
+    }
+    whitgl_set_shader_color(WHITGL_SHADER_EXTRA_0, 4, c);
 
     whitgl_sys_draw_finish();
 }
 
 
 void player_deal_damage(player_t *p, int dmg) {
-    p->damage_severity = 1.0f;
+    p->last_damage = note;
     p->health = MAX(0, p->health - dmg);
 }
 
-static int player_update(player_t *p, float dt)
+static void player_on_note(player_t *p, int note) {
+    if (note % 8 == 4) {
+        if (!p->moved) {
+            whitgl_sys_color col = {128, 0, 0, 255};
+            notify("YOU DIDN'T MOVE!", col);
+            player_deal_damage(p, 2);
+        }
+        p->moved = false;
+    }
+}
+
+static int player_update(player_t *p, int note)
 {
     if (p->angle != p->look_angle && p->last_rotate_dir == 1) {
         p->look_angle = (p->look_angle + 8) % 256;
@@ -501,15 +532,10 @@ static int player_update(player_t *p, float dt)
         p->look_pos.y -= 32;
     }
 
-    p->look_direction.x = cos(p->look_angle * whitgl_pi / 128.0f);
-    p->look_direction.y = sin(p->look_angle * whitgl_pi / 128.0f);
-    p->move_direction.x = cos(p->angle * whitgl_pi / 128.0f);
-    p->move_direction.y = sin(p->angle * whitgl_pi / 128.0f);
-    whitgl_ivec world_move_dir;
-    world_move_dir.x = (p->move_direction.x*p->move);
-    world_move_dir.y = (p->move_direction.y*p->move);
-    p->pos = whitgl_ivec_add(p->pos, world_move_dir);
-    p->damage_severity = MAX(0.0f, p->damage_severity - dt);
+    p->look_facing.x = cos(p->look_angle * whitgl_pi / 128.0f);
+    p->look_facing.y = sin(p->look_angle * whitgl_pi / 128.0f);
+    p->facing.x = cos(p->angle * whitgl_pi / 128.0f);
+    p->facing.y = sin(p->angle * whitgl_pi / 128.0f);
     
     // Target if no rat targeted
     if (p->targeted_rat == -1) {
@@ -562,25 +588,68 @@ void game_input()
 {
     player_t *p = player;
 
-    int move = 0;
+    player->move = MOVE_NONE;
     if(whitgl_input_pressed(WHITGL_INPUT_UP))
-        move += 1;
+        player->move = MOVE_FORWARD;
     if(whitgl_input_pressed(WHITGL_INPUT_DOWN))
-        move -= 1;
+        player->move = MOVE_BACKWARD;
     /*if(whitgl_input_held(WHITGL_INPUT_RIGHT))
         move_dir.y -= 1.0;
     if(whitgl_input_held(WHITGL_INPUT_LEFT))
         move_dir.y += 1.0;*/
     if (whitgl_input_pressed(WHITGL_INPUT_RIGHT)) {
+        player->move = MOVE_TURN_RIGHT;
+    }
+    if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
+        player->move = MOVE_TURN_LEFT;
+    }
+    
+    whitgl_ivec newpos = p->pos;
+    if (p->move == MOVE_FORWARD) {
+        newpos = whitgl_ivec_add(p->pos, p->facing);
+    } else if (p->move == MOVE_BACKWARD) {
+        newpos = whitgl_ivec_sub(p->pos, p->facing);
+    } else if (p->move == MOVE_TURN_LEFT) {
+        p->angle = (p->angle - 64) % 256;
+        p->last_rotate_dir = -1;
+    } else if (p->move == MOVE_TURN_RIGHT) {
         p->angle = (p->angle + 64) % 256;
         p->last_rotate_dir = +1;
     }
-    if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
-        p->angle = (p->angle - 64) % 256;
-        p->last_rotate_dir = -1;
+    if (p->move != MOVE_NONE) {
+        p->moved = true;
+        p->move_time = note;
+
+        float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+        float time_to_next_beat = (note + 8) * secs_per_note - song_time;
+        float time_since_prev_beat = song_time - (int)(note / 8) * 8 * secs_per_note;
+        float best_time = whitgl_fmin(time_to_next_beat, time_since_prev_beat);
+        printf("%f\n", best_time);
+        whitgl_sys_color green = {0, 128, 0, 255};
+        whitgl_sys_color yellow = {128, 128, 0, 255};
+        whitgl_sys_color red = {128, 0, 0, 255};
+        whitgl_sys_color black = {0, 0, 0, 255};
+        if (best_time < 0.10f) {
+            notify("GOOD", black);
+            p->move_goodness = 2;
+            p->health += 1;
+        } else if (best_time < 0.20f) {
+            notify("MEDIOCRE", black);
+            p->move_goodness = 1;
+        } else {
+            notify("BAD", black);
+            player_deal_damage(p, 2);
+            p->move_goodness = 0;
+        }
     }
 
-    player->move = move;
+    if (tile_walkable[MAP_GET(&map, newpos.x, newpos.y)]) {
+        p->pos = newpos;
+    } else {
+        whitgl_sys_color red = {128, 0, 0, 255};
+        notify("You crashed!", red);
+        player_deal_damage(p, 5);
+    }
 
     if (whitgl_input_pressed(WHITGL_INPUT_A)) {
         /*int targeted = get_targeted_rat(player->targeted_rat, player->pos, player->look_direction);
@@ -595,7 +664,7 @@ void game_input()
             int best_idx = -1;
             note_t *beat = rat_get(p->targeted_rat)->beat;
             for (int i = -NOTES_PER_MEASURE/8; i < NOTES_PER_MEASURE/8; i++) {
-                int note_idx = _mod(cur_note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
+                int note_idx = _mod(note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
                 if (beat[note_idx].exists && !beat[note_idx].popped && abs(i) < best_candidate) {
                     best_idx = note_idx;
                     best_candidate = abs(i);
@@ -659,7 +728,7 @@ void game_cleanup() {
 
 void game_start() {
     whitgl_loop_seek(AMBIENT_MUSIC, 0.0f);
-    //whitgl_loop_set_paused(AMBIENT_MUSIC, false);
+    whitgl_loop_set_paused(AMBIENT_MUSIC, false);
 }
 
 void game_stop() {
@@ -690,26 +759,24 @@ int game_update(float dt) {
 
 
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    int next_cur_note = _mod((int)(song_time / secs_per_note), NOTES_PER_MEASURE * MEASURES_PER_LOOP);
+    int next_cur_note = whitgl_imax(note, (int)(song_time / secs_per_note));
     time_since_note = 0.0f;
-    for (; cur_note != next_cur_note; cur_note = _mod(cur_note + 1, NOTES_PER_MEASURE * MEASURES_PER_LOOP)) {
-        if (cur_note == 0) {
-            whitgl_loop_seek(0, 0.0f);
-        }
+    int next_state = player_update(player, dt);
+    for (; note != next_cur_note; note++) {
+        player_on_note(player, note);
         //notes_update(player, cur_loop, cur_note);
-        if (cur_note % (NOTES_PER_MEASURE / 16) == 0) {
+        if (note % (NOTES_PER_MEASURE / 16) == 0) {
             anim_objs_update();
         }
     }
     note_pop_text_update(dt);
     
     time_since_note = _fmod(song_time, secs_per_note);
-    int next_state = player_update(player, dt);
     if(cycles_to_astar == 0) {
-        rats_update(player, dt, cur_note, true, &map);
+        rats_update(player, dt, note, true, &map);
         cycles_to_astar = 100;
     } else {
-        rats_update(player, dt, cur_note, false, &map);
+        rats_update(player, dt, note, false, &map);
         cycles_to_astar--;
     }
     phys_update(&map, dt);
@@ -720,5 +787,5 @@ int game_update(float dt) {
 }
 
 void game_frame() {
-    frame(player, cur_loop, cur_note);
+    frame(player, note);
 }
