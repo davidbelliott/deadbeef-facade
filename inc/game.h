@@ -8,10 +8,11 @@
 #include <stdbool.h>
 
 typedef struct player_t {
-    physics_obj *phys;
+    whitgl_ivec pos;
+    whitgl_ivec look_pos;   // divide by 256 to get look pos
     int angle;
     int look_angle;
-    whitgl_float move_dir;
+    int move;
     whitgl_fvec look_direction;
     whitgl_fvec move_direction;
     int last_rotate_dir;

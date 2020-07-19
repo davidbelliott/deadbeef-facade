@@ -65,28 +65,30 @@ whitgl_float song_len = 0.0f;
 
 // Definitions of static helper functions
 
-static int get_targeted_rat(int cur_targeted, whitgl_fvec player_pos, whitgl_fvec player_look) {
+static int get_targeted_rat(int cur_targeted, whitgl_ivec player_pos, whitgl_ivec player_look_pos) {
+    whitgl_fvec player_look = {(float)player_look_pos.x / 256.0f + 0.5f, (float)player_look_pos.y / 256.0f + 0.5f};
     int next_targeted = get_closest_targeted_rat(player_pos, player_look, &map);
     return next_targeted;
 }
 
 static void player_destroy() {
-    phys_destroy(player->phys);
     free(player);
     player = NULL;
 }
 
-static void player_create(whitgl_fvec *pos, unsigned int angle) {
+static void player_create(whitgl_ivec pos, unsigned int angle) {
     if(player)
         player_destroy();
     player = (player_t*)malloc(sizeof(player_t));
     whitgl_fvec zero = {0.0, 0.0};
-    player->phys = phys_create(pos, &zero, 0.2);
+    player->pos = pos;
+    player->look_pos.x = pos.x * 256;
+    player->look_pos.y = pos.y * 256;
     player->angle = angle;
     player->look_angle = angle;
     player->look_direction = zero;
     player->move_direction = zero;
-    player->move_dir = 0.0f;
+    player->move = 0;
     player->last_rotate_dir = 1;
     player->health = 100;
     player->damage_severity = 0.0f;
@@ -303,13 +305,12 @@ static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_n
         rat_t *target = rat_get(targeted_rat);
         note_t *beat = target->beat;
         whitgl_fvec3 model_pos = {0.0f, 0.0f, 0.0f};
-        physics_obj *phys = target->phys;
-        whitgl_fvec3 pos = {phys->pos.x, phys->pos.y, 0.5f};
+        whitgl_fvec3 pos = {(float)target->pos.x, (float)target->pos.y, 0.5f};
         whitgl_fmat mv = whitgl_fmat_multiply(view, whitgl_fmat_translate(pos));
         whitgl_ivec window_coords = point_project(model_pos, mv, persp);
-        if (whitgl_fvec_dot(player->look_direction, whitgl_fvec_sub(phys->pos, player->phys->pos)) < 0) {
+        /*if (whitgl_ivec_dot(player->look_direction, whitgl_ivec_sub(target->pos, player->pos)) < 0) {
             window_coords.x = window_coords.x >= SCREEN_W / 2 ? 8 : SCREEN_W - 8;
-        }
+        }*/
         if (window_coords.x < 8) {
             window_coords.x = 8;
         } else if (window_coords.x > SCREEN_W - 8) {
@@ -437,15 +438,7 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
 
 static void frame(player_t *p, int cur_loop, int cur_note)
 {
-    printf("%f\t%f\n", p->look_angle, p->angle);
-    if (p->angle != p->look_angle && p->last_rotate_dir == 1) {
-        p->look_angle = (p->look_angle + 4) % 256;
-    } else if (p->angle != p->look_angle) {
-        p->look_angle = (p->look_angle - 4) % 256;
-    }
-
-
-
+    whitgl_fvec pov_pos = {(float)player->look_pos.x / 256.0f + 0.5f, (float)player->look_pos.y / 256.0f + 0.5f};
     whitgl_sys_draw_init(0);
 
     whitgl_sys_enable_depth(true);
@@ -454,7 +447,7 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     whitgl_fmat perspective = whitgl_fmat_perspective(fov, (float)SCREEN_W/(float)SCREEN_H, 0.1f, 100.0f);
     //whitgl_fmat perspective = whitgl_fmat_orthographic(-5.0f, 5.0f, 5.0f, -5.0f, -5.0f, 5.0f);
     whitgl_fvec3 up = {0,0,-1};
-    whitgl_fvec3 camera_pos = {player->phys->pos.x,player->phys->pos.y,0.5f};
+    whitgl_fvec3 camera_pos = {pov_pos.x, pov_pos.y, 0.5f};
     whitgl_fvec3 camera_to = {camera_pos.x + player->look_direction.x, camera_pos.y + player->look_direction.y,0.5f};
     whitgl_fmat view = whitgl_fmat_lookAt(camera_pos, camera_to, up);
     //whitgl_fmat model_matrix = whitgl_fmat_translate(camera_to);
@@ -464,8 +457,8 @@ static void frame(player_t *p, int cur_loop, int cur_note)
     whitgl_fvec3 skybox_pos = camera_pos;
     skybox_pos.z = -2.5f;
     //draw_skybox(skybox_pos, view, perspective);
-    raycast(&player->phys->pos, p->look_angle * whitgl_pi / 128.0f, view, perspective);
-    draw_floors(&player->phys->pos, view, perspective);
+    raycast(&pov_pos, p->look_angle * whitgl_pi / 128.0f, view, perspective);
+    draw_floors(&pov_pos, view, perspective);
     draw_rats(view, perspective);
 
     whitgl_sys_enable_depth(false);
@@ -491,23 +484,40 @@ void player_deal_damage(player_t *p, int dmg) {
 
 static int player_update(player_t *p, float dt)
 {
+    if (p->angle != p->look_angle && p->last_rotate_dir == 1) {
+        p->look_angle = (p->look_angle + 8) % 256;
+    } else if (p->angle != p->look_angle) {
+        p->look_angle = (p->look_angle - 8) % 256;
+    }
+
+    if (p->pos.x * 256 > p->look_pos.x) {
+        p->look_pos.x += 32;
+    } else if (p->pos.x * 256 < p->look_pos.x) {
+        p->look_pos.x -= 32;
+    }
+    if (p->pos.y * 256 > p->look_pos.y) {
+        p->look_pos.y += 32;
+    } else if (p->pos.y * 256 < p->look_pos.y) {
+        p->look_pos.y -= 32;
+    }
+
     p->look_direction.x = cos(p->look_angle * whitgl_pi / 128.0f);
     p->look_direction.y = sin(p->look_angle * whitgl_pi / 128.0f);
     p->move_direction.x = cos(p->angle * whitgl_pi / 128.0f);
     p->move_direction.y = sin(p->angle * whitgl_pi / 128.0f);
-    whitgl_fvec world_move_dir;
-    world_move_dir.x = (p->move_direction.x*p->move_dir);
-    world_move_dir.y = (p->move_direction.y*p->move_dir);
-    set_vel(p->phys, world_move_dir, MOVE_SPEED);
+    whitgl_ivec world_move_dir;
+    world_move_dir.x = (p->move_direction.x*p->move);
+    world_move_dir.y = (p->move_direction.y*p->move);
+    p->pos = whitgl_ivec_add(p->pos, world_move_dir);
     p->damage_severity = MAX(0.0f, p->damage_severity - dt);
     
     // Target if no rat targeted
     if (p->targeted_rat == -1) {
-        p->targeted_rat = get_closest_visible_rat(p->phys->pos, &map);
+        p->targeted_rat = get_closest_visible_rat(p->pos, &map);
     }
 
     // Test for portals, doors, etc
-    if (MAP_GET(&map, (int)p->phys->pos.x, (int)p->phys->pos.y) == TILE_TYPE_PORTAL) {
+    if (MAP_GET(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
         level++;
         char levelstr[256];
         snprintf(levelstr, 256, "data/lvl/lvl%d.png", level);
@@ -552,11 +562,11 @@ void game_input()
 {
     player_t *p = player;
 
-    whitgl_float move = 0.0f;
-    if(whitgl_input_held(WHITGL_INPUT_UP))
-        move += 1.0;
-    if(whitgl_input_held(WHITGL_INPUT_DOWN))
-        move -= 1.0;
+    int move = 0;
+    if(whitgl_input_pressed(WHITGL_INPUT_UP))
+        move += 1;
+    if(whitgl_input_pressed(WHITGL_INPUT_DOWN))
+        move -= 1;
     /*if(whitgl_input_held(WHITGL_INPUT_RIGHT))
         move_dir.y -= 1.0;
     if(whitgl_input_held(WHITGL_INPUT_LEFT))
@@ -570,13 +580,13 @@ void game_input()
         p->last_rotate_dir = -1;
     }
 
-    player->move_dir = move;
+    player->move = move;
 
     if (whitgl_input_pressed(WHITGL_INPUT_A)) {
-        int targeted = get_targeted_rat(player->targeted_rat, player->phys->pos, player->look_direction);
+        /*int targeted = get_targeted_rat(player->targeted_rat, player->pos, player->look_direction);
         if (targeted != -1) {
             player->targeted_rat = targeted;
-        }
+        }*/
     }
     
     if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT)) {
@@ -623,8 +633,8 @@ void game_init() {
     level = 1;
     game_load_level("data/lvl/lvl1.png", &map);
 
-    whitgl_fvec p_pos = {1.5, 2};
-    player_create(&p_pos, 0);
+    whitgl_ivec p_pos = {2, 2};
+    player_create(p_pos, 0);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
             if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
