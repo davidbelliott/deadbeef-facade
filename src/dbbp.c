@@ -326,14 +326,14 @@ int main(int argc, char* argv[])
         intro_init();
 
 
-        int game_state = GAME_STATE_GAME;
+        int game_state = GAME_STATE_INTRO;
         int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;
         whitgl_float dt = 0;
         bool paused = false;
 
-        game_start();
+        intro_start();
 
 	while (running) {
             whitgl_sound_update();

@@ -9,7 +9,7 @@ MODEL_WMD = $(MODEL_OBJ:.obj=.wmd)
 
 PROGRAM = dbbp
 
-all: $(PROGRAM) $(MODEL_WMD)
+all: $(PROGRAM) $(MODEL_WMD) data/tex/tex.png
 
 $(PROGRAM): $(OBJ)
 	gcc -o $@ $^ $(LDFLAGS)
@@ -19,6 +19,9 @@ $(PROGRAM): $(OBJ)
 
 $(MODEL_WMD): $(MODEL_OBJ)
 	./whitgl/scripts/process_model.py $(@:.wmd=.obj) $@ 
+
+data/tex/tex.png: data/tex/tex.bmp
+	convert data/tex/tex.bmp data/tex/tex.png
 
 .PHONY: clean
 clean:

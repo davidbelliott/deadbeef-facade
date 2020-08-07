@@ -27,6 +27,12 @@ char notification[64];
 whitgl_sys_color notif_col;
 int notif_update_time;
 
+char instruction[1024] = "";
+int instr_update_time;
+
+float note_calib_offset = 0.00f;
+int lvl_grace_period = 128;
+
 #define MOVE_NONE       0
 #define MOVE_FORWARD    1
 #define MOVE_BACKWARD   2
@@ -137,10 +143,16 @@ void game_load_level(char *levelname, map_t *map) {
 }
 
 void notify(const char *str, whitgl_sys_color color) {
-    strncpy(notification, str, 63);
-    notification[63] = 0;
+    strncpy(notification, str, 64);
+    notification[64] = 0;
     notif_update_time = note;
     notif_col = color;
+}
+
+void instruct(const char *str) {
+    strncpy(instruction, str, 1024);
+    notification[1024] = 0;
+    instr_update_time = note;
 }
 
 void game_free_level(map_t *map) {
@@ -217,7 +229,28 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_sys_draw_model(1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
+static void draw_note_overlay() {
+    if (note < lvl_grace_period - 8)
+        return;
+    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float time_to_next_beat = (note / 8 + 1) * 8 * secs_per_note - song_time + 0.01f;
+    float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
+
+    int width = SCREEN_W * frac_to_next_beat / 1;
+    //int height = (SCREEN_H - 2 * FONT_CHAR_H) * frac_to_next_beat;
+    int height = SCREEN_W * frac_to_next_beat / 1;
+
+    whitgl_sys_color white = {255, 255, 255, 255};
+    whitgl_iaabb iaabb = {{SCREEN_W / 2 - width / 2, SCREEN_H / 2 - height / 2},
+        {SCREEN_W / 2 + width / 2, SCREEN_H / 2 + height / 2}};
+    whitgl_sys_draw_hollow_iaabb(iaabb, 2, white);
+}
+
 static void draw_overlay(int cur_note) {
+
+    draw_note_overlay();
+
+    // Draw top bar
     int most_recent_note = note % 8;
     whitgl_sys_color fill_a = {0, 0, 128, 255};
     whitgl_sys_color fill_b = {128, 0, 0, 255};
@@ -226,6 +259,7 @@ static void draw_overlay(int cur_note) {
     char path[256] = "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: 60]";
     draw_window(path, top_iaabb, top_col);
 
+    // Draw health bar
     int elapsed = note - player->last_damage;
     int blue_val = (elapsed < 8 ? 255.0 / (8.0 - elapsed) : 255);
     int red_val = 255 - blue_val;
@@ -244,6 +278,26 @@ static void draw_overlay(int cur_note) {
         whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
                      {SCREEN_W / 2 + notif_width / 2, top_y + FONT_CHAR_H}};
         draw_window(notification, notif_iaabb, notif_col);
+    }
+
+    if (note - instr_update_time < 128) {
+        int instr_width = SCREEN_W / 2;
+        int top_y = 2 * FONT_CHAR_H;
+        whitgl_iaabb instr_iaabb = {{SCREEN_W / 2 - instr_width / 2, top_y},
+            {SCREEN_W / 2 + instr_width / 2, top_y + 4 * FONT_CHAR_H}};
+        whitgl_iaabb text_iaabb = {{instr_iaabb.a.x, instr_iaabb.a.y + FONT_CHAR_H},
+            instr_iaabb.b};
+
+        char wrapped[1024];
+        wrap_text(instruction, wrapped, 1024, text_iaabb);
+        whitgl_sys_color border = {0, 0, 128, 255};
+        whitgl_sys_color fill = {0, 0, 0, 255};
+        whitgl_sys_draw_iaabb(instr_iaabb, border);
+        whitgl_ivec title_pos = {text_iaabb.a.x, instr_iaabb.a.y};
+        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
+        whitgl_sys_draw_text(font, "INSTR:data/lvl/lvl1.json", title_pos);
+        whitgl_sys_draw_iaabb(text_iaabb, fill);
+        draw_str_with_newlines(wrapped, 1024, text_iaabb.a);
     }
 }
 
@@ -504,12 +558,28 @@ void player_deal_damage(player_t *p, int dmg) {
 
 static void player_on_note(player_t *p, int note) {
     if (note % 8 == 4) {
-        if (!p->moved) {
-            whitgl_sys_color col = {128, 0, 0, 255};
-            notify("YOU DIDN'T MOVE!", col);
-            player_deal_damage(p, 2);
+        if (note >= lvl_grace_period) {
+            if (!p->moved) {
+                whitgl_sys_color col = {128, 0, 0, 255};
+                notify("YOU DIDN'T MOVE!", col);
+                player_deal_damage(p, 2);
+            }
+            p->moved = false;
         }
-        p->moved = false;
+    } else if (note % 8 == 0 && note < lvl_grace_period) {
+        int beats_left = (lvl_grace_period - note) / 8;
+        char str[64];
+        const char *template = "%d...";
+        if (beats_left > 3)
+            snprintf(str, 64, template, beats_left);
+        else if (beats_left == 3)
+            strncpy(str, "READY", 64);
+        else if (beats_left == 2)
+            strncpy(str, "SET", 64);
+        else
+            strncpy(str, "GO!", 64);
+        whitgl_sys_color black = {0, 0, 0, 255};
+        notify(str, black);
     }
 }
 
@@ -604,25 +674,28 @@ void game_input()
         player->move = MOVE_TURN_LEFT;
     }
     
-    whitgl_ivec newpos = p->pos;
-    if (p->move == MOVE_FORWARD) {
-        newpos = whitgl_ivec_add(p->pos, p->facing);
-    } else if (p->move == MOVE_BACKWARD) {
-        newpos = whitgl_ivec_sub(p->pos, p->facing);
-    } else if (p->move == MOVE_TURN_LEFT) {
-        p->angle = (p->angle - 64) % 256;
-        p->last_rotate_dir = -1;
-    } else if (p->move == MOVE_TURN_RIGHT) {
-        p->angle = (p->angle + 64) % 256;
-        p->last_rotate_dir = +1;
-    }
-    if (p->move != MOVE_NONE) {
+    if (p->move != MOVE_NONE && note >= lvl_grace_period) {
+
+        whitgl_ivec newpos = p->pos;
+        if (p->move == MOVE_FORWARD) {
+            newpos = whitgl_ivec_add(p->pos, p->facing);
+        } else if (p->move == MOVE_BACKWARD) {
+            newpos = whitgl_ivec_sub(p->pos, p->facing);
+        } else if (p->move == MOVE_TURN_LEFT) {
+            p->angle = (p->angle - 64) % 256;
+            p->last_rotate_dir = -1;
+        } else if (p->move == MOVE_TURN_RIGHT) {
+            p->angle = (p->angle + 64) % 256;
+            p->last_rotate_dir = +1;
+        }
+
+
         p->moved = true;
         p->move_time = note;
 
         float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-        float time_to_next_beat = (note + 8) * secs_per_note - song_time;
-        float time_since_prev_beat = song_time - (int)(note / 8) * 8 * secs_per_note;
+        float time_to_next_beat = (note + 8) * secs_per_note - song_time + note_calib_offset;
+        float time_since_prev_beat = song_time - note_calib_offset - (int)(note / 8) * 8 * secs_per_note;
         float best_time = whitgl_fmin(time_to_next_beat, time_since_prev_beat);
         printf("%f\n", best_time);
         whitgl_sys_color green = {0, 128, 0, 255};
@@ -641,15 +714,16 @@ void game_input()
             player_deal_damage(p, 2);
             p->move_goodness = 0;
         }
+
+        if (tile_walkable[MAP_GET(&map, newpos.x, newpos.y)]) {
+            p->pos = newpos;
+        } else {
+            whitgl_sys_color red = {128, 0, 0, 255};
+            notify("You crashed!", red);
+            player_deal_damage(p, 5);
+        }
     }
 
-    if (tile_walkable[MAP_GET(&map, newpos.x, newpos.y)]) {
-        p->pos = newpos;
-    } else {
-        whitgl_sys_color red = {128, 0, 0, 255};
-        notify("You crashed!", red);
-        player_deal_damage(p, 5);
-    }
 
     if (whitgl_input_pressed(WHITGL_INPUT_A)) {
         /*int targeted = get_targeted_rat(player->targeted_rat, player->pos, player->look_direction);
@@ -707,8 +781,8 @@ void game_init() {
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
             if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
-                whitgl_fvec rat_pos = {x + 0.5f, y + 0.5f};
-                //rat_create(&rat_pos);
+                whitgl_ivec rat_pos = {x, y};
+                rat_create(rat_pos);
             }
         }
     }
@@ -729,6 +803,7 @@ void game_cleanup() {
 void game_start() {
     whitgl_loop_seek(AMBIENT_MUSIC, 0.0f);
     whitgl_loop_set_paused(AMBIENT_MUSIC, false);
+    instruct("Get ready to move to the chune so I can calibrate my Zune!");
 }
 
 void game_stop() {
@@ -759,7 +834,7 @@ int game_update(float dt) {
 
 
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    int next_cur_note = whitgl_imax(note, (int)(song_time / secs_per_note));
+    int next_cur_note = whitgl_imax(note, (int)((song_time - note_calib_offset) / secs_per_note));
     time_since_note = 0.0f;
     int next_state = player_update(player, dt);
     for (; note != next_cur_note; note++) {

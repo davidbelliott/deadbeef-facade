@@ -71,6 +71,8 @@ float _fmod(float a, float b);
 int _sign(double x);
 void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill);
 
+void draw_str_with_newlines(const char *text, int n_chars, whitgl_ivec pos);
+void wrap_text(const char *text, char *wrapped, int wrapped_len, whitgl_iaabb bounding_box);
 
 enum {
     GAME_STATE_GAME = 0,
