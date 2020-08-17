@@ -77,15 +77,21 @@ void wrap_text(const char *text, char *wrapped, int wrapped_len, whitgl_iaabb bo
 enum {
     GAME_STATE_GAME = 0,
     GAME_STATE_MENU = 1,
-    GAME_STATE_INTRO = 2
+    GAME_STATE_INTRO = 2,
+    GAME_STATE_MIDI = 3
 };
 
-#define N_TILE_TYPES 5
 #define TILE_TYPE_FLOOR     0
 #define TILE_TYPE_BBRICK    1
 #define TILE_TYPE_RBRICK    2
 #define TILE_TYPE_STONE     3
 #define TILE_TYPE_PORTAL    4
+#define N_TILE_TYPES        5
+
+#define ENTITY_TYPE_NONE    0
+#define ENTITY_TYPE_PLAYER  1
+#define ENTITY_TYPE_RAT     2
+#define N_ENTITY_TYPES      3
 
 extern int tile_lvl_rgb[N_TILE_TYPES][4];
 extern int tile_tex_offset[N_TILE_TYPES][2];

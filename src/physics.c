@@ -72,7 +72,7 @@ static bool try_to_move(physics_obj *obj, map_t *map, whitgl_fvec pos)
 
     for (int x = x0; x <= x1; x++) {
         for (int y = y0; y <= y1; y++) {
-            if (!tile_walkable[MAP_GET(map, x, y)])
+            if (!tile_walkable[MAP_TILE(map, x, y)])
                 return false;
         }
     }

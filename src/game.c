@@ -31,7 +31,7 @@ char instruction[1024] = "";
 int instr_update_time;
 
 float note_calib_offset = 0.00f;
-int lvl_grace_period = 128;
+int lvl_grace_period = 32;
 
 #define MOVE_NONE       0
 #define MOVE_FORWARD    1
@@ -117,14 +117,15 @@ void game_load_level(char *levelname, map_t *map) {
     whitgl_int w = 0, h = 0;
     bool ret = whitgl_sys_load_png(levelname, &w, &h, &data);
     if (!ret) {
-        map->data = NULL;
+        map->tiles = NULL;
         return;
     }
 
     map->w = (int)w;
     map->h = (int)h;
-    map->data = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
-    memset(map->data, 0, sizeof(unsigned char) * w * h);
+    map->tiles = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
+    map->entities = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
+    memset(map->tiles, 0, sizeof(unsigned char) * w * h);
 
     int data_idx, tile;
     for (int i = 0; i < w * h; i++) {
@@ -138,7 +139,8 @@ void game_load_level(char *levelname, map_t *map) {
                 break;
             }
         }
-        map->data[i] = tile;
+        map->tiles[i] = tile;
+        map->entities[i] = ENTITY_TYPE_NONE;
     }
 }
 
@@ -156,7 +158,8 @@ void instruct(const char *str) {
 }
 
 void game_free_level(map_t *map) {
-    free(map->data);
+    free(map->tiles);
+    free(map->entities);
 }
 
 void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
@@ -409,7 +412,7 @@ static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat p
 
     for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
         for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
-            if (MAP_GET(&map, x, y) == 0) {
+            if (MAP_TILE(&map, x, y) == 0) {
                 whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 1.0f};
                 draw_floor(pos, view, persp);
             }
@@ -465,7 +468,7 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
 
         bool draw = false;
         for (;;) {
-            if (!tile_walkable[MAP_GET(&map, x, y)]) {
+            if (!tile_walkable[MAP_TILE(&map, x, y)]) {
                 draw = true;
                 break;
             }
@@ -484,7 +487,7 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
         }
         if (!drawn[y * map.h + x] && draw) {
             whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(MAP_GET(&map, x, y), pos, view, persp);
+            draw_wall(MAP_TILE(&map, x, y), pos, view, persp);
             n_drawn++;
             drawn[y * map.h + x] = true;
         }
@@ -613,7 +616,7 @@ static int player_update(player_t *p, int note)
     }
 
     // Test for portals, doors, etc
-    if (MAP_GET(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
+    if (MAP_TILE(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
         level++;
         char levelstr[256];
         snprintf(levelstr, 256, "data/lvl/lvl%d.png", level);
@@ -658,20 +661,20 @@ void game_input()
 {
     player_t *p = player;
 
-    player->move = MOVE_NONE;
+    p->move = MOVE_NONE;
     if(whitgl_input_pressed(WHITGL_INPUT_UP))
-        player->move = MOVE_FORWARD;
+        p->move = MOVE_FORWARD;
     if(whitgl_input_pressed(WHITGL_INPUT_DOWN))
-        player->move = MOVE_BACKWARD;
+        p->move = MOVE_BACKWARD;
     /*if(whitgl_input_held(WHITGL_INPUT_RIGHT))
         move_dir.y -= 1.0;
     if(whitgl_input_held(WHITGL_INPUT_LEFT))
         move_dir.y += 1.0;*/
     if (whitgl_input_pressed(WHITGL_INPUT_RIGHT)) {
-        player->move = MOVE_TURN_RIGHT;
+        p->move = MOVE_TURN_RIGHT;
     }
     if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
-        player->move = MOVE_TURN_LEFT;
+        p->move = MOVE_TURN_LEFT;
     }
     
     if (p->move != MOVE_NONE && note >= lvl_grace_period) {
@@ -715,12 +718,17 @@ void game_input()
             p->move_goodness = 0;
         }
 
-        if (tile_walkable[MAP_GET(&map, newpos.x, newpos.y)]) {
-            p->pos = newpos;
-        } else {
-            whitgl_sys_color red = {128, 0, 0, 255};
-            notify("You crashed!", red);
-            player_deal_damage(p, 5);
+        if (p->move == MOVE_FORWARD || p->move == MOVE_BACKWARD) {
+            if (tile_walkable[MAP_TILE(&map, newpos.x, newpos.y)]
+                    && !MAP_ENTITY(&map, newpos.x, newpos.y)) {
+                MAP_SET_ENTITY(&map, p->pos.x, p->pos.y, ENTITY_TYPE_NONE);
+                p->pos = newpos;
+                MAP_SET_ENTITY(&map, newpos.x, newpos.y, ENTITY_TYPE_PLAYER);
+            } else {
+                whitgl_sys_color red = {128, 0, 0, 255};
+                notify("You crashed!", red);
+                player_deal_damage(p, 5);
+            }
         }
     }
 
@@ -780,9 +788,9 @@ void game_init() {
     player_create(p_pos, 0);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
-            if (rand() % 150 == 0 && MAP_GET(&map, x, y) == 0) {
+            if (rand() % 150 == 0 && MAP_TILE(&map, x, y) == 0) {
                 whitgl_ivec rat_pos = {x, y};
-                rat_create(rat_pos);
+                rat_create(rat_pos, &map);
             }
         }
     }
@@ -839,6 +847,7 @@ int game_update(float dt) {
     int next_state = player_update(player, dt);
     for (; note != next_cur_note; note++) {
         player_on_note(player, note);
+        rats_on_note(player, note, true, &map);
         //notes_update(player, cur_loop, cur_note);
         if (note % (NOTES_PER_MEASURE / 16) == 0) {
             anim_objs_update();

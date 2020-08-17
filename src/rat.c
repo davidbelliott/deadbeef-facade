@@ -13,7 +13,7 @@ rat_t* rat_get(int id) {
     return rats[id];
 }
 
-rat_t* rat_create(whitgl_ivec pos) {
+rat_t* rat_create(whitgl_ivec pos, map_t *map) {
     rat_t *rat = NULL;
     for (int i = 0; i < MAX_N_RATS; i++) {
         if(!rats[i]) {
@@ -29,10 +29,13 @@ rat_t* rat_create(whitgl_ivec pos) {
             rat->path = NULL;
             rat->health = 50;
             rat->dead = false;
+            rat->notes_between_update = 16;
 
             for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
                 note_create(&rat->beat[j], rand() % 2 == 0 && j % 8 == 0);
             }
+
+            MAP_SET_ENTITY(map, pos.x, pos.y, ENTITY_TYPE_RAT);
             rats[rat->id] = rat;
             break;
         }
@@ -76,7 +79,7 @@ void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
             whitgl_fvec rat_size = {128, 128};
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 2, rat_offset);
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 3, rat_size);
-            whitgl_fvec3 pos = {(float)rats[i]->look_pos.x / 256.0f, (float)rats[i]->look_pos.y / 256.0f, 0.5f};
+            whitgl_fvec3 pos = {(float)rats[i]->look_pos.x / 256.0f + 0.5f, (float)rats[i]->look_pos.y / 256.0f + 0.5f, 0.5f};
             draw_billboard(pos, view, persp);
         }
     }
@@ -118,7 +121,7 @@ bool line_of_sight_exists(whitgl_fvec p1, whitgl_fvec p2, map_t *map) {
             dy = INFINITY;
 
     while(x != (int)p2.x || y != (int)p2.y) {
-            if (MAP_GET(map, x, y) != 0) {
+            if (MAP_TILE(map, x, y) != 0) {
                 return false;
             }
 
@@ -159,18 +162,27 @@ bool unobstructed(whitgl_ivec p1, whitgl_ivec p2, map_t *map) {
     return line_of_sight_exists(p11, p21, map) && line_of_sight_exists(p12, p22, map);
 }
 
-void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map) {
+static bool rat_try_move(rat_t *r, whitgl_ivec target, map_t *map) {
+    if (!tile_walkable[MAP_TILE(map, target.x, target.y)] || 
+            MAP_ENTITY(map, target.x, target.y) != ENTITY_TYPE_NONE) {
+        return false;
+    }
+    MAP_SET_ENTITY(map, r->pos.x, r->pos.y, ENTITY_TYPE_NONE);
+    MAP_SET_ENTITY(map, target.x, target.y, ENTITY_TYPE_RAT);
+    r->pos = target;
+    return true;
+}
+
+void rats_on_note(struct player_t *p, int note, bool use_astar, map_t *map) {
     for(int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            bool line_of_sight = unobstructed(rats[i]->pos, p->pos, map);
+        if (rats[i] && note % rats[i]->notes_between_update == 0) {
             // Deal damage if close enough
-            if (line_of_sight
-                    && whitgl_ivec_sqmagnitude(whitgl_ivec_sub(rats[i]->pos, p->pos)) <= RAT_ATTACK_RADIUS*RAT_ATTACK_RADIUS
-                    && cur_note % RAT_ATTACK_NOTES == 0) {
+            if (whitgl_ivec_eq(rats[i]->look_pos, p->look_pos)
+                    && note % RAT_ATTACK_NOTES == 0) {
                 player_deal_damage(p, RAT_DAMAGE);
             }
             // If within astar range and using astar, find a path
-            if(!line_of_sight && use_astar && diag_distance(p->pos, rats[i]->pos) < 20.0) {
+            if(use_astar && diag_distance(p->pos, rats[i]->pos) < 20.0) {
                 whitgl_ivec start = {(int)(rats[i]->pos.x), (int)(rats[i]->pos.y)};
                 whitgl_ivec end = {(int)(p->pos.x), (int)(p->pos.y)};
                 rats[i]->path = astar(start, end, map);
@@ -180,23 +192,35 @@ void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_ast
                 }
             }
             // Follow whatever path the rat has found, if can't see player
-            if(!line_of_sight && rats[i]->path) {
+            if(rats[i]->path) {
                 astar_node_t *next_node = (astar_node_t*)rats[i]->path->data;
                 whitgl_ivec target = {next_node->pt.x, next_node->pt.y};
                 WHITGL_LOG("Following path -> (%f, %f)", target.x, target.y);
-                rats[i]->pos = target;
-                if(whitgl_ivec_eq(rats[i]->look_pos, whitgl_ivec_scale_val(rats[i]->pos, 256))) {
+                if (rat_try_move(rats[i], target, map)) {
                     astar_node_t *reached_node = pop_front(&rats[i]->path);
                     free(reached_node);
+                } else {
+                    astar_free_node_list(&rats[i]->path);
+                    rats[i]->path = NULL;
                 }
-            } else if(line_of_sight) {
-                // Otherwise go straight towards the player
-                WHITGL_LOG("Following line of sight");
-                rats[i]->path = NULL;
-                whitgl_ivec target;
-                target.x = p->pos.x - (p->pos.x - rats[i]->pos.x) * 0.5;
-                target.y = p->pos.y - (p->pos.y - rats[i]->pos.y) * 0.5;
-                rats[i]->pos = target;
+            }
+        }
+    }
+}
+
+void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map) {
+    for (int i = 0; i < MAX_N_RATS; i++) {
+        if (rats[i]) {
+            rat_t *r = rats[i];
+            if (r->pos.x * 256 > r->look_pos.x) {
+                r->look_pos.x += 32;
+            } else if (r->pos.x * 256 < r->look_pos.x) {
+                r->look_pos.x -= 32;
+            }
+            if (r->pos.y * 256 > r->look_pos.y) {
+                r->look_pos.y += 32;
+            } else if (r->pos.y * 256 < r->look_pos.y) {
+                r->look_pos.y -= 32;
             }
         }
     }

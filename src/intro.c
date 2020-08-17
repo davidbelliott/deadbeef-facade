@@ -48,7 +48,6 @@ int intro_update(float dt) {
         //whitgl_sound_play(0, 1, 1);
     }
     text_chars = new_text_chars;
-    WHITGL_LOG("elapsed: %f", elapsed_time);
     return next_gamestate;
 }
 

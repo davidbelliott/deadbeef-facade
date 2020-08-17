@@ -74,7 +74,7 @@ float idiag_distance(whitgl_ivec start, whitgl_ivec end) {
 }
 
 list_t* astar(whitgl_ivec start, whitgl_ivec end, map_t *map) {
-    static const int offsets[] = {-1, 0, 1};
+    static const int offsets[] = {-1, 0, 1, 0};
     list_t *open = NULL;
     list_t *closed = NULL;
     push_front(&open, astar_alloc_node(start.x, start.y, NULL));
@@ -91,19 +91,16 @@ list_t* astar(whitgl_ivec start, whitgl_ivec end, map_t *map) {
             astar_free_node_list(&closed);
             return path;
         }
-        for(int i = 0; i < 3; i++) {
+        for(int i = 0; i < 4; i++) {
             int dx = offsets[i];
-            for(int j = 0; j < 3; j++) {
-                int dy = offsets[j];
-                if(     (dx != 0 || dy != 0) // not both zero
-                        && x+dx < MAP_WIDTH && x+dx >= 0 && y+dy < MAP_HEIGHT && y+dy >= 0 // within bounds
-                        && MAP_GET(map, x+dx, y+dy) == 0 // no wall in target spot
-                        && (dx == 0 || dy == 0 || (MAP_GET(map, x, y+dy) == 0 && MAP_GET(map, x+dx, y) == 0))) // valid if diagonal
-                {
-                    /*if(q->pt.x == 9 && q->pt.y == 5)
-                        printf("Found neighbor: (%d, %d)\n", x+dx, y+dy);*/
-                    push_front(&s, astar_alloc_node(x+dx, y+dy, q));
-                }
+            int dy = offsets[(i + 1) % 4];
+            if(     (dx != 0 || dy != 0) // not both zero
+                    && x+dx < MAP_WIDTH && x+dx >= 0 && y+dy < MAP_HEIGHT && y+dy >= 0 // within bounds
+                    && MAP_TILE(map, x+dx, y+dy) == 0 && MAP_ENTITY(map, x+dx, y+dy) != ENTITY_TYPE_RAT) // no wall in target spot
+            {
+                /*if(q->pt.x == 9 && q->pt.y == 5)
+                    printf("Found neighbor: (%d, %d)\n", x+dx, y+dy);*/
+                push_front(&s, astar_alloc_node(x+dx, y+dy, q));
             }
         }
         while(s) {

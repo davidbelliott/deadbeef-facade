@@ -1,5 +1,6 @@
 #include "game.h"
 #include "intro.h"
+#include "midi.h"
 #include "common.h"
 
 #include <assert.h>
@@ -324,16 +325,18 @@ int main(int argc, char* argv[])
 
         game_init();
         intro_init();
+        midi_init();
 
 
-        int game_state = GAME_STATE_INTRO;
+        int game_state = GAME_STATE_MIDI;
         int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;
         whitgl_float dt = 0;
         bool paused = false;
 
-        intro_start();
+        //intro_start();
+        midi_start();
 
 	while (running) {
             whitgl_sound_update();
@@ -350,6 +353,9 @@ int main(int argc, char* argv[])
                     case GAME_STATE_INTRO:
                         next_state = intro_update(dt);
                         intro_input();
+                        break;
+                    case GAME_STATE_MIDI:
+                        next_state = midi_update(dt);
                         break;
                     default:
                         break;
@@ -397,6 +403,7 @@ int main(int argc, char* argv[])
 
         game_cleanup();
         intro_cleanup();
+        midi_cleanup();
 
         whitgl_input_shutdown();
         // Shutdown sound
