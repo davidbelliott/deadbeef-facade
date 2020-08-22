@@ -43,10 +43,12 @@ rat_t* rat_create(whitgl_ivec pos, map_t *map) {
     return rat;
 }
 
-void rat_destroy(rat_t *rat, player_t *p) {
+static void rat_destroy(rat_t *rat, player_t *p, map_t *m) {
     if (p->targeted_rat == rat->id) {
         p->targeted_rat = -1;
     }
+
+    MAP_SET_ENTITY(m, rat->pos.x, rat->pos.y, ENTITY_TYPE_NONE);
     rats[rat->id] = NULL;
     free(rat);
 }
@@ -58,10 +60,14 @@ void rat_deal_damage(rat_t *rat, int dmg) {
     }
 }
 
-void rats_prune(player_t *p) {
+void rat_kill(int rat_id) {
+    rats[rat_id]->dead = true;
+}
+
+void rats_prune(player_t *p, map_t *m) {
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i] && rats[i]->dead) {
-            rat_destroy(rats[i], p);
+            rat_destroy(rats[i], p, m);
         }
     }
 }
@@ -176,11 +182,6 @@ static bool rat_try_move(rat_t *r, whitgl_ivec target, map_t *map) {
 void rats_on_note(struct player_t *p, int note, bool use_astar, map_t *map) {
     for(int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i] && note % rats[i]->notes_between_update == 0) {
-            // Deal damage if close enough
-            if (whitgl_ivec_eq(rats[i]->look_pos, p->look_pos)
-                    && note % RAT_ATTACK_NOTES == 0) {
-                player_deal_damage(p, RAT_DAMAGE);
-            }
             // If within astar range and using astar, find a path
             if(use_astar && diag_distance(p->pos, rats[i]->pos) < 20.0) {
                 whitgl_ivec start = {(int)(rats[i]->pos.x), (int)(rats[i]->pos.y)};
@@ -200,6 +201,8 @@ void rats_on_note(struct player_t *p, int note, bool use_astar, map_t *map) {
                     astar_node_t *reached_node = pop_front(&rats[i]->path);
                     free(reached_node);
                 } else {
+                    if (MAP_ENTITY(map, target.x, target.y) == ENTITY_TYPE_PLAYER)
+                        player_deal_damage(p, RAT_DAMAGE);
                     astar_free_node_list(&rats[i]->path);
                     rats[i]->path = NULL;
                 }
@@ -226,30 +229,20 @@ void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_ast
     }
 }
 
-int get_closest_targeted_rat(whitgl_ivec player_pos, whitgl_fvec player_look, map_t *map) {
+int get_closest_targeted_rat(whitgl_ivec player_pos, whitgl_ivec player_facing, map_t *map) {
     int closest_hit_rat = -1;
-    float closest_dist_sq = 0.0f;
-    for (int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            whitgl_fvec3 d = { rats[i]->pos.x - player_pos.x,
-                rats[i]->pos.y - player_pos.y, 0.0f };
-            whitgl_fvec3 l = { player_look.x, player_look.y, 0.0f };
-            whitgl_fvec3 cross = whitgl_fvec3_cross(l, d);
-            float sinsq = (cross.z * cross.z) / (d.x * d.x + d.y * d.y);
-            float max_sinsq = RAT_HITBOX_RADIUS * RAT_HITBOX_RADIUS / (RAT_HITBOX_RADIUS * RAT_HITBOX_RADIUS + d.x*d.x + d.y*d.y);
-            //WHITGL_LOG("sinsq: %f\tmax_sinsq: %f\tline_of_sight: %d", sinsq, max_sinsq, line_of_sight_exists(&player->pos, &rats[i]->pos));
-            whitgl_fvec ppos = {(float)player_pos.x, (float)player_pos.y};
-            whitgl_fvec rpos = {(float)rats[i]->pos.x, (float)rats[i]->pos.y};
-            if (sinsq < max_sinsq && line_of_sight_exists(ppos, rpos, map)) {
-                float dist_sq = d.x * d.x + d.y * d.y;
-                if (dist_sq < closest_dist_sq || closest_hit_rat == -1) {
-                    closest_hit_rat = i;
-                    closest_dist_sq = dist_sq;
+    whitgl_ivec test_pos = player_pos;
+    for (int i = 0; i < MAX_DIST_TO_TARGET_RAT; i++) {
+        test_pos = whitgl_ivec_add(test_pos, player_facing);
+        if (MAP_ENTITY(map, test_pos.x, test_pos.y) == ENTITY_TYPE_RAT) {
+            for (int i = 0; i < MAX_N_RATS; i++) {
+                if (rats[i] && whitgl_ivec_eq(rats[i]->pos, test_pos)) {
+                    return i;
                 }
             }
         }
     }
-    return closest_hit_rat;
+    return -1;
 }
 
 int get_closest_visible_rat(whitgl_ivec player_pos, map_t *map) {
@@ -272,10 +265,10 @@ int get_closest_visible_rat(whitgl_ivec player_pos, map_t *map) {
     return closest_visible_rat;
 }
 
-void rats_destroy_all(player_t *p) {
+void rats_destroy_all(player_t *p, map_t *m) {
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i]) {
-            rat_destroy(rats[i], p);
+            rat_destroy(rats[i], p, m);
         }
     }
 }

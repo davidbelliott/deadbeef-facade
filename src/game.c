@@ -38,6 +38,7 @@ int lvl_grace_period = 32;
 #define MOVE_BACKWARD   2
 #define MOVE_TURN_LEFT  3
 #define MOVE_TURN_RIGHT 4
+#define MOVE_ATTACK     5
 
 whitgl_ivec crosshair_pos = {SCREEN_W / 2 - 8, SCREEN_H / 2 - 8};
 
@@ -80,15 +81,17 @@ whitgl_float song_len = 0.0f;
 
 // Definitions of static helper functions
 
-static int get_targeted_rat(int cur_targeted, whitgl_ivec player_pos, whitgl_ivec player_look_pos) {
-    whitgl_fvec player_look = {(float)player_look_pos.x / 256.0f + 0.5f, (float)player_look_pos.y / 256.0f + 0.5f};
-    int next_targeted = get_closest_targeted_rat(player_pos, player_look, &map);
-    return next_targeted;
-}
-
 static void player_destroy() {
     free(player);
     player = NULL;
+}
+
+void game_from_midi() {
+    if (player->targeted_rat != -1) {
+        rat_kill(player->targeted_rat);
+        player->targeted_rat = -1;
+    }
+    player->move = MOVE_NONE;
 }
 
 static void player_create(whitgl_ivec pos, unsigned int angle) {
@@ -610,11 +613,6 @@ static int player_update(player_t *p, int note)
     p->facing.x = cos(p->angle * whitgl_pi / 128.0f);
     p->facing.y = sin(p->angle * whitgl_pi / 128.0f);
     
-    // Target if no rat targeted
-    if (p->targeted_rat == -1) {
-        p->targeted_rat = get_closest_visible_rat(p->pos, &map);
-    }
-
     // Test for portals, doors, etc
     if (MAP_TILE(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
         level++;
@@ -625,6 +623,11 @@ static int player_update(player_t *p, int note)
         game_load_level(levelstr, &map);
         return GAME_STATE_INTRO;
     }
+
+    if (p->targeted_rat != -1) {
+        return GAME_STATE_MIDI;
+    }
+
     return GAME_STATE_GAME;
 }
 
@@ -659,22 +662,26 @@ void game_pause(bool paused) {
 
 void game_input()
 {
+    int next_state = GAME_STATE_GAME;
+
     player_t *p = player;
 
     p->move = MOVE_NONE;
-    if(whitgl_input_pressed(WHITGL_INPUT_UP))
+    if(whitgl_input_pressed(WHITGL_INPUT_UP)) {
         p->move = MOVE_FORWARD;
-    if(whitgl_input_pressed(WHITGL_INPUT_DOWN))
+    } else if(whitgl_input_pressed(WHITGL_INPUT_DOWN)) {
         p->move = MOVE_BACKWARD;
-    /*if(whitgl_input_held(WHITGL_INPUT_RIGHT))
-        move_dir.y -= 1.0;
-    if(whitgl_input_held(WHITGL_INPUT_LEFT))
-        move_dir.y += 1.0;*/
-    if (whitgl_input_pressed(WHITGL_INPUT_RIGHT)) {
+    } else if (whitgl_input_pressed(WHITGL_INPUT_RIGHT)) {
         p->move = MOVE_TURN_RIGHT;
-    }
-    if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
+    } else if (whitgl_input_pressed(WHITGL_INPUT_LEFT)) {
         p->move = MOVE_TURN_LEFT;
+    } else if (whitgl_input_pressed(WHITGL_INPUT_A)) {
+        int targeted = get_closest_targeted_rat(
+                player->pos, player->facing, &map);
+        if (targeted != -1) {
+            player->targeted_rat = targeted;
+            p->move = MOVE_ATTACK;
+        }
     }
     
     if (p->move != MOVE_NONE && note >= lvl_grace_period) {
@@ -691,7 +698,6 @@ void game_input()
             p->angle = (p->angle + 64) % 256;
             p->last_rotate_dir = +1;
         }
-
 
         p->moved = true;
         p->move_time = note;
@@ -730,16 +736,12 @@ void game_input()
                 player_deal_damage(p, 5);
             }
         }
-    }
 
 
-    if (whitgl_input_pressed(WHITGL_INPUT_A)) {
-        /*int targeted = get_targeted_rat(player->targeted_rat, player->pos, player->look_direction);
-        if (targeted != -1) {
-            player->targeted_rat = targeted;
-        }*/
+        if (p->move == MOVE_ATTACK) {
+        }
     }
-    
+
     if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT)) {
         if (p->targeted_rat != -1) {
             int best_candidate = NOTES_PER_MEASURE/8+1;
@@ -770,9 +772,6 @@ void game_input()
             }
         }
     }
-
-    whitgl_ivec mouse_pos = whitgl_input_mouse_pos(PIXEL_DIM);
-    //p->angle = mouse_pos.x * MOUSE_SENSITIVITY / (double)(SCREEN_W);
 }
 
 void game_init() {
@@ -803,7 +802,7 @@ void game_init() {
 }
 
 void game_cleanup() {
-    rats_destroy_all(player);
+    rats_destroy_all(player, &map);
     player_destroy();
     game_free_level(&map);
 }
@@ -865,7 +864,7 @@ int game_update(float dt) {
     }
     phys_update(&map, dt);
 
-    rats_prune(player);
+    rats_prune(player, &map);
 
     return next_state;
 }

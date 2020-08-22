@@ -24,14 +24,14 @@ typedef struct player_t player_t;
 
 rat_t* rat_get(int id);
 rat_t* rat_create(whitgl_ivec pos, map_t *map);
-void rat_destroy(rat_t *rat, player_t *p);
+void rat_kill(int rat_id);
 void rat_deal_damage(rat_t *rat, int dmg);
-int get_closest_targeted_rat(whitgl_ivec player_pos, whitgl_fvec player_look, map_t *map);
+int get_closest_targeted_rat(whitgl_ivec player_pos, whitgl_ivec player_facing, map_t *map);
 int get_closest_visible_rat(whitgl_ivec player_pos, map_t *map);
-void rats_prune(player_t *p);
+void rats_prune(player_t *p, map_t *m);
 void draw_rats(whitgl_fmat view, whitgl_fmat persp);
 void rats_on_note(player_t *p, int note, bool use_astar, map_t *map);
 void rats_update(player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map);
-void rats_destroy_all(player_t *p);
+void rats_destroy_all(player_t *p, map_t *m);
 
 #endif // RAT_H

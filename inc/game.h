@@ -10,7 +10,7 @@
 
 typedef struct player_t {
     whitgl_ivec pos;
-    whitgl_ivec look_pos;   // divide by 256 to get look pos
+    whitgl_ivec look_pos;   // divide by 256 to get apparent pos
     int angle;
     int look_angle;
     int move;
@@ -28,6 +28,7 @@ typedef struct player_t {
 void player_deal_damage(player_t *p, int dmg);
 
 void game_init();
+void game_from_midi();
 void game_cleanup();
 // Action to take when entering this from another state
 void game_start();

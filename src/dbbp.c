@@ -328,15 +328,14 @@ int main(int argc, char* argv[])
         midi_init();
 
 
-        int game_state = GAME_STATE_MIDI;
-        int next_state = game_state;
         whitgl_timer_init();
         whitgl_float time = 0.0f;
         whitgl_float dt = 0;
         bool paused = false;
 
-        //intro_start();
-        midi_start();
+        int game_state = GAME_STATE_INTRO;
+        int next_state = game_state;
+        intro_start();
 
 	while (running) {
             whitgl_sound_update();
@@ -376,26 +375,18 @@ int main(int argc, char* argv[])
             }
             // State change logic
             if (next_state != game_state) {
-                // Exit logic
-                switch (game_state) {
-                    case GAME_STATE_GAME:
-                        game_stop();
-                        break;
-                    case GAME_STATE_INTRO:
-                        break;
-                    default:
-                        break;
-                }
-                // Entrance logic
-                switch (next_state) {
-                    case GAME_STATE_GAME:
+                if (game_state == GAME_STATE_INTRO) {
+                    if (next_state == GAME_STATE_GAME) {
                         game_start();
-                        break;
-                    case GAME_STATE_INTRO:
-                        intro_start();
-                        break;
-                    default:
-                        break;
+                    }
+                } else if (game_state == GAME_STATE_GAME) {
+                    if (next_state == GAME_STATE_MIDI) {
+                        midi_start();
+                    }
+                } else if (game_state == GAME_STATE_MIDI) {
+                    if (next_state == GAME_STATE_GAME) {
+                        game_from_midi();
+                    }
                 }
                 game_state = next_state;
             }

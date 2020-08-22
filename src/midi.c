@@ -175,5 +175,5 @@ int midi_update(float dt) {
     for (int i = 0; i < 256 && notes[i].exists; i++) {
         printf("%d:\t%d\n", notes[i].beat, notes[i].chan);
     }
-    return GAME_STATE_INTRO;
+    return GAME_STATE_GAME;
 }

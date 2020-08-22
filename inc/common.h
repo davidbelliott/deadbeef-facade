@@ -28,6 +28,7 @@ enum {
 #define RAT_SPEED MOVE_SPEED * 0.6
 #define RAT_HITBOX_RADIUS 0.5f
 #define RAT_ATTACK_RADIUS 0.75f
+#define MAX_DIST_TO_TARGET_RAT 5
 #define RAT_ATTACK_NOTES 48
 #define RAT_DAMAGE 10
 #define MAX_N_RATS 256
