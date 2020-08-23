@@ -48,7 +48,6 @@ enum {
 #define FONT_CHAR_W 9
 #define FONT_CHAR_H 16
 
-#define AMBIENT_MUSIC -1
 
 #define SHORT_TEXT_MAX_LEN 256
 

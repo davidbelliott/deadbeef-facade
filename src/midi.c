@@ -22,6 +22,8 @@
 #include "midi-parser.h"
 #include "midi.h"
 
+#include "rat.h"
+
 typedef struct note_t {
     bool exists;
     int beat;
@@ -29,8 +31,8 @@ typedef struct note_t {
 } note_t;
 
 double time;
-
 note_t notes[256] = {{false}};
+static player_t *player;
 
 static void translate_to_notes(struct midi_parser *parser);
 
@@ -84,8 +86,9 @@ static int parse_file(const char *path)
     return 0;
 }
 
-void midi_init() {
+void midi_init(player_t *p) {
     printf("Initializing MIDI gamestate\n");
+    player = p;
     //parse_file("/home/david/gdrive/projects/deadbeef-facade/midi-parser/sample.mid");
     parse_file("sample2.mid");
     time = 0.0;
@@ -176,4 +179,48 @@ int midi_update(float dt) {
         printf("%d:\t%d\n", notes[i].beat, notes[i].chan);
     }
     return GAME_STATE_GAME;
+}
+
+/*static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_note) {
+    if (targeted_rat != -1) {
+        rat_t *target = rat_get(targeted_rat);
+        note_t *beat = target->beat;
+        whitgl_fvec3 model_pos = {0.0f, 0.0f, 0.0f};
+        whitgl_fvec3 pos = {(float)target->pos.x, (float)target->pos.y, 0.5f};
+        whitgl_fmat mv = whitgl_fmat_multiply(view, whitgl_fmat_translate(pos));
+        whitgl_ivec window_coords = {SCREEN_W / 2, SCREEN_H / 2};
+
+        whitgl_sys_color fill = {0, 0, 0, 255};
+        whitgl_sys_color border = {255, 255, 255, 255};
+        int pixel_x = window_coords.x;
+        whitgl_iaabb zune_iaabb = {{pixel_x - 8, 0}, {pixel_x + 8, SCREEN_H / 2 + 8}};
+        whitgl_iaabb line1 = {{pixel_x - 7, 0}, {pixel_x - 7, SCREEN_H / 2 - 8}};
+        whitgl_iaabb line2 = {{pixel_x + 8, 0}, {pixel_x + 8, SCREEN_H / 2 - 8}};
+        whitgl_iaabb line3 = {{pixel_x + 8, SCREEN_H / 2 - 8}, {pixel_x, SCREEN_H / 2}};
+        whitgl_iaabb line4 = {{pixel_x - 7, SCREEN_H / 2 - 7}, {pixel_x, SCREEN_H / 2}};
+        whitgl_sys_draw_iaabb(zune_iaabb, fill);
+        whitgl_sys_draw_line(line1, border);
+        whitgl_sys_draw_line(line2, border);
+        //whitgl_sys_draw_line(line3, border);
+        //whitgl_sys_draw_line(line4, border);
+        draw_notes(beat, cur_note, time_since_note, pixel_x - 8);
+
+        whitgl_ivec target_pos = crosshair_pos;
+        target_pos.x = pixel_x - 8;
+        whitgl_sprite sprite = {0, {128,64+16*2},{16,16}};
+        whitgl_ivec frametr = {0, 0};
+        whitgl_sys_draw_sprite(sprite, frametr, target_pos);
+
+        draw_note_pop_text(target_pos);
+    }
+    whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
+    whitgl_iaabb box1 = {{crosshairs_pos.x - 1, crosshairs_pos.y - 4}, {crosshairs_pos.x + 1, crosshairs_pos.y + 4}};
+    whitgl_iaabb box2 = {{crosshairs_pos.x - 4, crosshairs_pos.y - 1}, {crosshairs_pos.x + 4, crosshairs_pos.y + 1}};
+    whitgl_sys_color border = {255, 255, 255, 255};
+    whitgl_sys_draw_iaabb(box1, border);
+    whitgl_sys_draw_iaabb(box2, border);
+}*/
+
+void midi_frame() {
+    //draw_rat_overlays(player->targeted_rat, cur_note, time_since_note, view, perspective);
 }

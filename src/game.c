@@ -3,8 +3,8 @@
 #include "map.h"
 #include "anim.h"
 #include "rat.h"
-#include "physics.h"
 #include "intro.h"
+#include "music.h"
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -30,7 +30,6 @@ int notif_update_time;
 char instruction[1024] = "";
 int instr_update_time;
 
-float note_calib_offset = 0.00f;
 int lvl_grace_period = 32;
 
 #define MOVE_NONE       0
@@ -55,11 +54,6 @@ enum {
     RAT_TYPE_REPRODUCER
 };
 
-typedef struct loop_t {
-    char name[SHORT_TEXT_MAX_LEN];
-    note_t notes[TOTAL_NUM_NOTES];
-} loop_t;
-
 int earliest_active_note_offset = 0;
 int note = 0;
 
@@ -71,13 +65,7 @@ player_t* player = NULL;
 int level = 1;
 map_t map = {0};
 
-int cycles_to_astar = 0;
-int actual_song_millis = 0;
-int prev_actual_song_millis = 0;
-
 whitgl_float time_since_note = 0;
-whitgl_float song_time = 0.0f;
-whitgl_float song_len = 0.0f;
 
 // Definitions of static helper functions
 
@@ -238,6 +226,8 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
 static void draw_note_overlay() {
     if (note < lvl_grace_period - 8)
         return;
+
+    float song_time = music_get_song_time();
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
     float time_to_next_beat = (note / 8 + 1) * 8 * secs_per_note - song_time + 0.01f;
     float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
@@ -342,70 +332,6 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
     //windowCoordinate[2]=(1.0+fTempo[6])*0.5;	// Between 0 and 1
     WHITGL_LOG("window coord: %d, %d", window_coord.x, window_coord.y);
     return window_coord;
-}
-
-static void draw_note_pop_text(whitgl_ivec pos) {
-    if (note_pop_text.exists) {
-        int str_len = strlen("BASED");
-        int x = pos.x - str_len * FONT_CHAR_W;
-        int y = pos.y + 8 + 20.0f * (note_pop_text.life);
-        whitgl_iaabb iaabb = {{x, y - FONT_CHAR_H}, {x + str_len * FONT_CHAR_W, y}};
-        whitgl_sys_color col = {0, 0, 0, 255};
-        whitgl_sys_draw_iaabb(iaabb, col);
-
-        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-        whitgl_ivec text_pos = { x, y - FONT_CHAR_H};
-        whitgl_sys_draw_text(font, note_pop_text.text, text_pos);
-    }
-}
-
-
-static void draw_rat_overlays(int targeted_rat, int cur_note, float time_since_note, whitgl_fmat view, whitgl_fmat persp) {
-    if (targeted_rat != -1) {
-        rat_t *target = rat_get(targeted_rat);
-        note_t *beat = target->beat;
-        whitgl_fvec3 model_pos = {0.0f, 0.0f, 0.0f};
-        whitgl_fvec3 pos = {(float)target->pos.x, (float)target->pos.y, 0.5f};
-        whitgl_fmat mv = whitgl_fmat_multiply(view, whitgl_fmat_translate(pos));
-        whitgl_ivec window_coords = point_project(model_pos, mv, persp);
-        /*if (whitgl_ivec_dot(player->look_direction, whitgl_ivec_sub(target->pos, player->pos)) < 0) {
-            window_coords.x = window_coords.x >= SCREEN_W / 2 ? 8 : SCREEN_W - 8;
-        }*/
-        if (window_coords.x < 8) {
-            window_coords.x = 8;
-        } else if (window_coords.x > SCREEN_W - 8) {
-            window_coords.x = SCREEN_W - 8;
-        }
-
-        whitgl_sys_color fill = {0, 0, 0, 255};
-        whitgl_sys_color border = {255, 255, 255, 255};
-        int pixel_x = window_coords.x;
-        whitgl_iaabb zune_iaabb = {{pixel_x - 8, 0}, {pixel_x + 8, SCREEN_H / 2 + 8}};
-        whitgl_iaabb line1 = {{pixel_x - 7, 0}, {pixel_x - 7, SCREEN_H / 2 - 8}};
-        whitgl_iaabb line2 = {{pixel_x + 8, 0}, {pixel_x + 8, SCREEN_H / 2 - 8}};
-        whitgl_iaabb line3 = {{pixel_x + 8, SCREEN_H / 2 - 8}, {pixel_x, SCREEN_H / 2}};
-        whitgl_iaabb line4 = {{pixel_x - 7, SCREEN_H / 2 - 7}, {pixel_x, SCREEN_H / 2}};
-        whitgl_sys_draw_iaabb(zune_iaabb, fill);
-        whitgl_sys_draw_line(line1, border);
-        whitgl_sys_draw_line(line2, border);
-        //whitgl_sys_draw_line(line3, border);
-        //whitgl_sys_draw_line(line4, border);
-        draw_notes(beat, cur_note, time_since_note, pixel_x - 8);
-
-        whitgl_ivec target_pos = crosshair_pos;
-        target_pos.x = pixel_x - 8;
-        whitgl_sprite sprite = {0, {128,64+16*2},{16,16}};
-        whitgl_ivec frametr = {0, 0};
-        whitgl_sys_draw_sprite(sprite, frametr, target_pos);
-
-        draw_note_pop_text(target_pos);
-    }
-    whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
-    whitgl_iaabb box1 = {{crosshairs_pos.x - 1, crosshairs_pos.y - 4}, {crosshairs_pos.x + 1, crosshairs_pos.y + 4}};
-    whitgl_iaabb box2 = {{crosshairs_pos.x - 4, crosshairs_pos.y - 1}, {crosshairs_pos.x + 4, crosshairs_pos.y + 1}};
-    whitgl_sys_color border = {255, 255, 255, 255};
-    whitgl_sys_draw_iaabb(box1, border);
-    whitgl_sys_draw_iaabb(box2, border);
 }
 
 static void draw_sky() {
@@ -531,7 +457,6 @@ static void frame(player_t *p, int cur_note)
 
     whitgl_sys_enable_depth(false);
 
-    draw_rat_overlays(player->targeted_rat, cur_note, time_since_note, view, perspective);
 
     //draw_notes(cur_loop, cur_note, time_since_note);
     draw_overlay(cur_note);
@@ -631,33 +556,18 @@ static int player_update(player_t *p, int note)
     return GAME_STATE_GAME;
 }
 
-/*static void notes_update(struct player_t *p, int cur_loop, int cur_note) {
-    if (loop_active) {
-        earliest_active_note_offset = MAX(-NOTES_PER_MEASURE / 8, earliest_active_note_offset - 1);
-        int bottom_note_idx = _mod(cur_note - NOTES_PER_MEASURE / 4 - 1, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
-        note_t *bottom_note = &aloops[cur_loop].notes[bottom_note_idx];
-        if (bottom_note->exists) {
-            if (bottom_note->popped) {
-                bottom_note->popped = false;
-            }
-            bottom_note->anim->frametr.x = 0;
-            bottom_note->anim->frametr.y = 0;
+static void note_pop_text_update(float dt) {
+    if (note_pop_text.exists) {
+        note_pop_text.life = MAX(0.0f, note_pop_text.life - dt);
+        if (note_pop_text.life == 0.0f) {
+            note_pop_text.exists = false;
         }
     }
-}*/
-
-static void note_pop_text_update(float dt) {
-        if (note_pop_text.exists) {
-            note_pop_text.life = MAX(0.0f, note_pop_text.life - dt);
-            if (note_pop_text.life == 0.0f) {
-                note_pop_text.exists = false;
-            }
-        }
 }
 
 
 void game_pause(bool paused) {
-    whitgl_loop_set_paused(AMBIENT_MUSIC, paused);
+    music_set_paused(AMBIENT_MUSIC, paused);
 }
 
 void game_input()
@@ -702,9 +612,10 @@ void game_input()
         p->moved = true;
         p->move_time = note;
 
+        float song_time = music_get_song_time();
         float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-        float time_to_next_beat = (note + 8) * secs_per_note - song_time + note_calib_offset;
-        float time_since_prev_beat = song_time - note_calib_offset - (int)(note / 8) * 8 * secs_per_note;
+        float time_to_next_beat = (note + 8) * secs_per_note - song_time;
+        float time_since_prev_beat = song_time - (int)(note / 8) * 8 * secs_per_note;
         float best_time = whitgl_fmin(time_to_next_beat, time_since_prev_beat);
         printf("%f\n", best_time);
         whitgl_sys_color green = {0, 128, 0, 255};
@@ -736,41 +647,6 @@ void game_input()
                 player_deal_damage(p, 5);
             }
         }
-
-
-        if (p->move == MOVE_ATTACK) {
-        }
-    }
-
-    if (whitgl_input_pressed(WHITGL_INPUT_MOUSE_LEFT)) {
-        if (p->targeted_rat != -1) {
-            int best_candidate = NOTES_PER_MEASURE/8+1;
-            int best_idx = -1;
-            note_t *beat = rat_get(p->targeted_rat)->beat;
-            for (int i = -NOTES_PER_MEASURE/8; i < NOTES_PER_MEASURE/8; i++) {
-                int note_idx = _mod(note + i, NOTES_PER_MEASURE * MEASURES_PER_LOOP);
-                if (beat[note_idx].exists && !beat[note_idx].popped && abs(i) < best_candidate) {
-                    best_idx = note_idx;
-                    best_candidate = abs(i);
-                }
-            }
-            if (best_idx != -1) {
-                float acc = 1.0f - (float)best_candidate / (float)(NOTES_PER_MEASURE / 8);
-                //beat[best_idx].popped = true;
-                //beat[best_idx].anim->frametr.x = 0;
-                //beat[best_idx].anim->frametr.y = 1;
-                if (acc <= 0.25f) {
-                    set_note_pop_text("BAD");
-                } else if (acc <= 0.50f) {
-                    set_note_pop_text("OK");
-                } else if (acc <= 0.75f) {
-                    set_note_pop_text("GOOD");
-                } else {
-                    set_note_pop_text("BASED");
-                }
-                rat_deal_damage(rat_get(p->targeted_rat), (int)(4.0f * acc));
-            }
-        }
     }
 }
 
@@ -793,12 +669,6 @@ void game_init() {
             }
         }
     }
-
-    cycles_to_astar = 0;
-    actual_song_millis = 0;
-    prev_actual_song_millis = 0;
-
-    song_len = whitgl_loop_get_length(AMBIENT_MUSIC) / 1000.0f;
 }
 
 void game_cleanup() {
@@ -808,8 +678,7 @@ void game_cleanup() {
 }
 
 void game_start() {
-    whitgl_loop_seek(AMBIENT_MUSIC, 0.0f);
-    whitgl_loop_set_paused(AMBIENT_MUSIC, false);
+    music_play_from_beginning(AMBIENT_MUSIC);
     instruct("Get ready to move to the chune so I can calibrate my Zune!");
 }
 
@@ -818,52 +687,27 @@ void game_stop() {
 }
 
 int game_update(float dt) {
-    song_time = _fmod(song_time + dt, song_len);
-    actual_song_millis = whitgl_loop_tell(AMBIENT_MUSIC);
-    if (actual_song_millis != prev_actual_song_millis) {
-        float actual_song_time = actual_song_millis / 1000.0f;
-        float diff_ff, diff_rr;
-        if (actual_song_time > song_time) {
-            diff_ff = actual_song_time - song_time;
-            diff_rr = song_time + song_len - actual_song_time;
-        } else {
-            diff_ff = actual_song_time + song_len - actual_song_time;
-            diff_rr = song_time - actual_song_time;
-        }
-        if (diff_ff < diff_rr) {
-            song_time += diff_ff / 2.0f;
-        } else {
-            song_time -= diff_rr / 2.0f;
-        }
-        song_time = _fmod(song_time, song_len);
-        prev_actual_song_millis = actual_song_millis;
-    }
-
-
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    int next_cur_note = whitgl_imax(note, (int)((song_time - note_calib_offset) / secs_per_note));
+    int next_cur_note = music_get_cur_note();
     time_since_note = 0.0f;
     int next_state = player_update(player, dt);
-    for (; note != next_cur_note; note++) {
-        player_on_note(player, note);
-        rats_on_note(player, note, true, &map);
-        //notes_update(player, cur_loop, cur_note);
-        if (note % (NOTES_PER_MEASURE / 16) == 0) {
-            anim_objs_update();
+    if (next_cur_note > note) {
+        for (; note != next_cur_note; note++) {
+            player_on_note(player, note);
+            rats_on_note(player, note, true, &map);
+            //notes_update(player, cur_loop, cur_note);
+            if (note % (NOTES_PER_MEASURE / 16) == 0) {
+                anim_objs_update();
+            }
         }
+    } else {
+        // Going back in time--shouldn't normally happen
+        note = next_cur_note;
     }
     note_pop_text_update(dt);
     
-    time_since_note = _fmod(song_time, secs_per_note);
-    if(cycles_to_astar == 0) {
-        rats_update(player, dt, note, true, &map);
-        cycles_to_astar = 100;
-    } else {
-        rats_update(player, dt, note, false, &map);
-        cycles_to_astar--;
-    }
-    phys_update(&map, dt);
-
+    time_since_note = music_get_time_since_note();
+    rats_update(player, dt, note, true, &map);
     rats_prune(player, &map);
 
     return next_state;

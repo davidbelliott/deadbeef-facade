@@ -1,6 +1,7 @@
 #include "game.h"
 #include "intro.h"
 #include "midi.h"
+#include "music.h"
 #include "common.h"
 
 #include <assert.h>
@@ -318,8 +319,8 @@ int main(int argc, char* argv[])
         whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 1, fspritesheet_size);
 
         whitgl_loop_add(0, "data/snd/metronome-short.ogg");
-        whitgl_loop_add(AMBIENT_MUSIC, "data/snd/ambient.ogg");
 
+        music_init();
 
 	//whitgl_sound_add(0, "data/snd/tick.ogg");
 
@@ -344,6 +345,7 @@ int main(int argc, char* argv[])
             // Update
             if (!paused) {
                 time += dt;
+                music_update(dt);
                 switch (game_state) {
                     case GAME_STATE_GAME:
                         next_state = game_update(dt);

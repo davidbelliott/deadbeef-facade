@@ -3,8 +3,6 @@
 
 #define PLAYER_ANGLE_PI_FRAC 128
 
-#include "physics.h"
-
 #include <stdbool.h>
 #include <whitgl/sys.h>
 

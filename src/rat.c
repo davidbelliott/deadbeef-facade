@@ -31,10 +31,6 @@ rat_t* rat_create(whitgl_ivec pos, map_t *map) {
             rat->dead = false;
             rat->notes_between_update = 16;
 
-            for (int j = 0; j < NOTES_PER_MEASURE * MEASURES_PER_LOOP; j++) {
-                note_create(&rat->beat[j], rand() % 2 == 0 && j % 8 == 0);
-            }
-
             MAP_SET_ENTITY(map, pos.x, pos.y, ENTITY_TYPE_RAT);
             rats[rat->id] = rat;
             break;

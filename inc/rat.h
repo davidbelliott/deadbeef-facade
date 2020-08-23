@@ -1,10 +1,8 @@
 #ifndef RAT_H
 #define RAT_H
 
-#include "physics.h"
 #include "list.h"
 #include "anim.h"
-#include "note.h"
 #include "map.h"
 
 typedef struct rat_t {
@@ -17,7 +15,6 @@ typedef struct rat_t {
     list_t *path;
     int health;
     bool dead;
-    note_t beat[NOTES_PER_MEASURE * MEASURES_PER_LOOP];
 } rat_t;
 
 typedef struct player_t player_t;
