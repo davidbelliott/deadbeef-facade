@@ -55,6 +55,13 @@ float music_get_song_time() {
     return song_time;
 }
 
+// get the length of the song in notes (32nd notes)
+int music_get_song_len() {
+    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float song_len = whitgl_loop_get_length(AMBIENT_MUSIC) / 1000.0f;
+    return (int)(song_len / secs_per_note);
+}
+
 // div=1 means 32nd notes, 2 means 16th notes...
 int music_get_cur_note() {
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);

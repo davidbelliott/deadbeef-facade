@@ -372,6 +372,9 @@ int main(int argc, char* argv[])
                 case GAME_STATE_INTRO:
                     intro_frame();
                     break;
+                case GAME_STATE_MIDI:
+                    midi_frame();
+                    break;
                 default:
                     break;
             }

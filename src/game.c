@@ -257,6 +257,9 @@ static void draw_overlay(int cur_note) {
 
     // Draw health bar
     int elapsed = note - player->last_damage;
+    if (elapsed < 0) {
+        elapsed += music_get_song_len();
+    }
     int blue_val = (elapsed < 8 ? 255.0 / (8.0 - elapsed) : 255);
     int red_val = 255 - blue_val;
     whitgl_sys_color col = {red_val, 0, blue_val, 255};
@@ -594,7 +597,7 @@ void game_input()
         }
     }
     
-    if (p->move != MOVE_NONE && note >= lvl_grace_period) {
+    if (!p->moved && p->move != MOVE_NONE && note >= lvl_grace_period) {
 
         whitgl_ivec newpos = p->pos;
         if (p->move == MOVE_FORWARD) {
@@ -612,21 +615,23 @@ void game_input()
         p->moved = true;
         p->move_time = note;
 
+        // Compute how good of a move it is
         float song_time = music_get_song_time();
         float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
         float time_to_next_beat = (note + 8) * secs_per_note - song_time;
         float time_since_prev_beat = song_time - (int)(note / 8) * 8 * secs_per_note;
         float best_time = whitgl_fmin(time_to_next_beat, time_since_prev_beat);
-        printf("%f\n", best_time);
+        int best_n_notes = best_time / secs_per_note;
+        printf("%d\n", best_n_notes);
         whitgl_sys_color green = {0, 128, 0, 255};
         whitgl_sys_color yellow = {128, 128, 0, 255};
         whitgl_sys_color red = {128, 0, 0, 255};
         whitgl_sys_color black = {0, 0, 0, 255};
-        if (best_time < 0.10f) {
+        if (best_n_notes <= 1) {
             notify("GOOD", black);
             p->move_goodness = 2;
             p->health += 1;
-        } else if (best_time < 0.20f) {
+        } else if (best_n_notes <= 2) {
             notify("MEDIOCRE", black);
             p->move_goodness = 1;
         } else {
@@ -688,22 +693,17 @@ void game_stop() {
 
 int game_update(float dt) {
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    int next_cur_note = music_get_cur_note();
+    int next_note = music_get_cur_note();
     time_since_note = 0.0f;
     int next_state = player_update(player, dt);
-    if (next_cur_note > note) {
-        for (; note != next_cur_note; note++) {
-            player_on_note(player, note);
-            rats_on_note(player, note, true, &map);
-            //notes_update(player, cur_loop, cur_note);
-            if (note % (NOTES_PER_MEASURE / 16) == 0) {
-                anim_objs_update();
-            }
+    if (next_note > note) {
+        player_on_note(player, next_note);
+        rats_on_note(player, next_note, true, &map);
+        if (note % (NOTES_PER_MEASURE / 16) == 0) {
+            anim_objs_update();
         }
-    } else {
-        // Going back in time--shouldn't normally happen
-        note = next_cur_note;
     }
+    note = next_note;
     note_pop_text_update(dt);
     
     time_since_note = music_get_time_since_note();
