@@ -56,6 +56,7 @@ enum {
 
 int earliest_active_note_offset = 0;
 int note = 0;
+int prev_note;
 
 note_pop_text_t note_pop_text = { 0 };
 
@@ -224,12 +225,15 @@ static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
 }
 
 static void draw_note_overlay() {
-    if (note < lvl_grace_period - 8)
+    if (note < lvl_grace_period - 8) {
+        printf("Grace period\n");
         return;
+    }
 
+    int cur_music_note = music_get_cur_note();
     float song_time = music_get_song_time();
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float time_to_next_beat = (note / 8 + 1) * 8 * secs_per_note - song_time + 0.01f;
+    float time_to_next_beat = (cur_music_note / 8 + 1) * 8 * secs_per_note - song_time + 0.01f;
     float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
 
     int width = SCREEN_W * frac_to_next_beat / 1;
@@ -559,16 +563,6 @@ static int player_update(player_t *p, int note)
     return GAME_STATE_GAME;
 }
 
-static void note_pop_text_update(float dt) {
-    if (note_pop_text.exists) {
-        note_pop_text.life = MAX(0.0f, note_pop_text.life - dt);
-        if (note_pop_text.life == 0.0f) {
-            note_pop_text.exists = false;
-        }
-    }
-}
-
-
 void game_pause(bool paused) {
     music_set_paused(AMBIENT_MUSIC, paused);
 }
@@ -684,6 +678,8 @@ void game_cleanup() {
 
 void game_start() {
     music_play_from_beginning(AMBIENT_MUSIC);
+    note = 0;
+    prev_note = music_get_cur_note();
     instruct("Get ready to move to the chune so I can calibrate my Zune!");
 }
 
@@ -694,19 +690,17 @@ void game_stop() {
 int game_update(float dt) {
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
     int next_note = music_get_cur_note();
-    time_since_note = 0.0f;
-    int next_state = player_update(player, dt);
-    if (next_note > note) {
-        player_on_note(player, next_note);
-        rats_on_note(player, next_note, true, &map);
+    if (prev_note != next_note) {
+        note++;
+        player_on_note(player, note);
+        rats_on_note(player, note, true, &map);
         if (note % (NOTES_PER_MEASURE / 16) == 0) {
             anim_objs_update();
         }
+        prev_note = next_note;
     }
-    note = next_note;
-    note_pop_text_update(dt);
     
-    time_since_note = music_get_time_since_note();
+    int next_state = player_update(player, note);
     rats_update(player, dt, note, true, &map);
     rats_prune(player, &map);
 

@@ -35,8 +35,8 @@ note_t notes[256] = {{false}};
 static player_t *player;
 
 int damage_to_deal;
-static int note;
-static int end_note;
+static int prev_music_beat; // What the cur_note was last time we updated
+static int note;            // # of notes elapsed since starting the state
 
 #define MIDI_LEN 128     // number of notes in this clip
 
@@ -105,9 +105,8 @@ void midi_cleanup() {
 void midi_start() {
     printf("Starting MIDI gamestate\n");
     time = 0.0;
-    note = music_get_cur_note();
-    end_note = (note + MIDI_LEN) % music_get_song_len();
-    printf("End note: %d\n", end_note);
+    note = 0;
+    prev_music_beat = music_get_cur_note();
 }
 
 static void translate_to_notes(struct midi_parser *parser) {
@@ -182,14 +181,15 @@ static void translate_to_notes(struct midi_parser *parser) {
 }
 
 int midi_update(float dt) {
-    int next_note = music_get_cur_note();
-    if (note != next_note) {
-        note = (note + 1) % music_get_song_len();
+    int next_music_beat = music_get_cur_note();
+    if (next_music_beat != prev_music_beat) {
+        note++;
+        if (note >= MIDI_LEN) {
+            return GAME_STATE_GAME;
+        }
+        prev_music_beat = next_music_beat;
     }
-    if (note != end_note) {
-        return GAME_STATE_MIDI;
-    }
-    return GAME_STATE_GAME;
+    return GAME_STATE_MIDI;
 }
 
 static void draw_note_overlay() {
