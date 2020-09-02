@@ -30,7 +30,7 @@ int notif_update_time;
 char instruction[1024] = "";
 int instr_update_time;
 
-int lvl_grace_period = 32;
+int lvl_grace_period = 64;
 
 #define MOVE_NONE       0
 #define MOVE_FORWARD    1
@@ -215,25 +215,26 @@ static void draw_wall(int type, whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat 
     whitgl_sys_draw_model(0, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
-static void draw_floor(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
+static void draw_floor(whitgl_ivec pos, whitgl_fmat view, whitgl_fmat persp, bool ceil) {
+    whitgl_fvec3 draw_pos = {pos.x + 0.5f, pos.y + 0.5f, ceil ? -1.0f : 1.0f};
     whitgl_fvec floor_offset = {64, 0};
     whitgl_fvec floor_size = {64, 64};
     whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 2, floor_offset);
     whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 3, floor_size);
-    whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
-    whitgl_sys_draw_model(1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
+    whitgl_fmat model_matrix = whitgl_fmat_translate(draw_pos);
+    whitgl_sys_draw_model(ceil ? 4 : 1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
 static void draw_note_overlay() {
     if (note < lvl_grace_period - 8) {
-        printf("Grace period\n");
-        return;
+        return; // grace period
     }
 
     int cur_music_note = music_get_cur_note();
     float song_time = music_get_song_time();
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float time_to_next_beat = (cur_music_note / 8 + 1) * 8 * secs_per_note - song_time + 0.01f;
+    float time_to_next_beat = secs_per_note * (8 - cur_music_note % 8)
+        - music_get_time_since_note();
     float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
 
     int width = SCREEN_W * frac_to_next_beat / 1;
@@ -342,6 +343,10 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
 }
 
 static void draw_sky() {
+    whitgl_iaabb full_iaabb = {{0, 0}, {SCREEN_W, SCREEN_H}};
+    whitgl_sys_color sky_col = {0, 0, 30, 255};
+
+    whitgl_sys_draw_iaabb(full_iaabb, sky_col);
 }
 
 static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat persp) {
@@ -349,8 +354,8 @@ static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat p
     for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
         for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
             if (MAP_TILE(&map, x, y) == 0) {
-                whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 1.0f};
-                draw_floor(pos, view, persp);
+                whitgl_ivec pos = {x, y};
+                draw_floor(pos, view, persp, false);
             }
         }
     }
@@ -432,6 +437,14 @@ static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitg
     //WHITGL_LOG("n_drawn: %d", n_drawn);
 }
 
+static void draw_crosshairs() {
+    whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
+    whitgl_iaabb box1 = {{crosshairs_pos.x - 1, crosshairs_pos.y - 4}, {crosshairs_pos.x + 1, crosshairs_pos.y + 4}};
+    whitgl_iaabb box2 = {{crosshairs_pos.x - 4, crosshairs_pos.y - 1}, {crosshairs_pos.x + 4, crosshairs_pos.y + 1}};
+    whitgl_sys_color border = {255, 255, 255, 255};
+    whitgl_sys_draw_iaabb(box1, border);
+    whitgl_sys_draw_iaabb(box2, border);
+}
 
 static void frame(player_t *p, int cur_note)
 {
@@ -465,12 +478,13 @@ static void frame(player_t *p, int cur_note)
     whitgl_sys_enable_depth(false);
 
 
+    draw_crosshairs();
     //draw_notes(cur_loop, cur_note, time_since_note);
     draw_overlay(cur_note);
 
     // draw move overlay if needed
     int elapsed = note - player->move_time;
-    int color_amt = (elapsed < 4 ? (4 - elapsed) * 32 : 0);
+    int color_amt = (elapsed < 4 ? (4 - elapsed) * 64 : 0);
     whitgl_sys_color c = {0, 0, 0, 0};
     switch (p->move_goodness) {
         case 2:
@@ -591,7 +605,7 @@ void game_input()
         }
     }
     
-    if (!p->moved && p->move != MOVE_NONE && note >= lvl_grace_period) {
+    if (!p->moved && p->move != MOVE_NONE && note >= lvl_grace_period - 4) {
 
         whitgl_ivec newpos = p->pos;
         if (p->move == MOVE_FORWARD) {
@@ -610,21 +624,17 @@ void game_input()
         p->move_time = note;
 
         // Compute how good of a move it is
-        float song_time = music_get_song_time();
-        float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-        float time_to_next_beat = (note + 8) * secs_per_note - song_time;
-        float time_since_prev_beat = song_time - (int)(note / 8) * 8 * secs_per_note;
-        float best_time = whitgl_fmin(time_to_next_beat, time_since_prev_beat);
-        int best_n_notes = best_time / secs_per_note;
-        printf("%d\n", best_n_notes);
+        int cur_note_mod = music_get_cur_note() % 8;
+        int best_n_notes = cur_note_mod >= 4 ? 7 - cur_note_mod : cur_note_mod;
         whitgl_sys_color green = {0, 128, 0, 255};
         whitgl_sys_color yellow = {128, 128, 0, 255};
         whitgl_sys_color red = {128, 0, 0, 255};
         whitgl_sys_color black = {0, 0, 0, 255};
+        printf("Best notes: %d\n", best_n_notes);
         if (best_n_notes <= 1) {
             notify("GOOD", black);
             p->move_goodness = 2;
-            p->health += 1;
+            p->health = MIN(100, p->health + 1);
         } else if (best_n_notes <= 2) {
             notify("MEDIOCRE", black);
             p->move_goodness = 1;
@@ -654,17 +664,19 @@ void game_init() {
     whitgl_load_model(1, "data/obj/floor.wmd");
     whitgl_load_model(2, "data/obj/billboard.wmd");
     whitgl_load_model(3, "data/obj/skybox.wmd");
+    whitgl_load_model(4, "data/obj/ceil.wmd");
 
     level = 1;
     game_load_level("data/lvl/lvl1.png", &map);
 
     whitgl_ivec p_pos = {2, 2};
     player_create(p_pos, 0);
+    rat_create(p_pos, &map);
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
             if (rand() % 150 == 0 && MAP_TILE(&map, x, y) == 0) {
                 whitgl_ivec rat_pos = {x, y};
-                rat_create(rat_pos, &map);
+                //rat_create(rat_pos, &map);
             }
         }
     }
@@ -690,11 +702,17 @@ void game_stop() {
 int game_update(float dt) {
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
     int next_note = music_get_cur_note();
+    int song_len = music_get_song_len();
     if (prev_note != next_note) {
-        note++;
+        if (prev_note < next_note)
+            note += next_note - prev_note;
+        else
+            note += song_len - 1 - prev_note + next_note;
+        //player_on_note(player, next_note);
         player_on_note(player, note);
+        printf("%d / %d\n", note, next_note);
         rats_on_note(player, note, true, &map);
-        if (note % (NOTES_PER_MEASURE / 16) == 0) {
+        if (next_note % (NOTES_PER_MEASURE / 8) == 0) {
             anim_objs_update();
         }
         prev_note = next_note;

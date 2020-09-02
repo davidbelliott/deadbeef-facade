@@ -76,8 +76,8 @@ static void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp
 void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i]) {
-            //whitgl_fvec rat_offset = {128 + 64 * rats[i]->anim->frametr.x, 0};
-            whitgl_fvec rat_offset = {188, 87};
+            whitgl_fvec rat_offset = {188 + 128 * rats[i]->anim->frametr.x, 87};
+            //whitgl_fvec rat_offset = {188, 87};
             whitgl_fvec rat_size = {128, 128};
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 2, rat_offset);
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 3, rat_size);

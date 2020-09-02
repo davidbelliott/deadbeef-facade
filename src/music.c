@@ -66,7 +66,6 @@ int music_get_song_len() {
 int music_get_cur_note() {
     float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
     int cur_note = (int)(song_time / secs_per_note);
-    printf("Cur note: %d\n", cur_note);
     return cur_note;
 }
 
