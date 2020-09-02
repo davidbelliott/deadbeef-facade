@@ -4,7 +4,9 @@
 #include "anim.h"
 #include "rat.h"
 #include "intro.h"
+#include "midi.h"
 #include "music.h"
+#include "graphics.h"
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -15,9 +17,9 @@
 #include <whitgl/timer.h>
 
 #include <assert.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -206,25 +208,6 @@ static void draw_skybox(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
     whitgl_sys_draw_model(3, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
 }
 
-static void draw_wall(int type, whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
-    whitgl_fvec wall_offset = {tile_tex_offset[type][0], tile_tex_offset[type][1]};
-    whitgl_fvec wall_size = {64, 64};
-    whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 2, wall_offset);
-    whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 3, wall_size);
-    whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
-    whitgl_sys_draw_model(0, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
-}
-
-static void draw_floor(whitgl_ivec pos, whitgl_fmat view, whitgl_fmat persp, bool ceil) {
-    whitgl_fvec3 draw_pos = {pos.x + 0.5f, pos.y + 0.5f, ceil ? -1.0f : 1.0f};
-    whitgl_fvec floor_offset = {64, 0};
-    whitgl_fvec floor_size = {64, 64};
-    whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 2, floor_offset);
-    whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 3, floor_size);
-    whitgl_fmat model_matrix = whitgl_fmat_translate(draw_pos);
-    whitgl_sys_draw_model(ceil ? 4 : 1, WHITGL_SHADER_EXTRA_0, model_matrix, view, persp);
-}
-
 static void draw_note_overlay() {
     if (note < lvl_grace_period - 8) {
         return; // grace period
@@ -349,94 +332,6 @@ static void draw_sky() {
     whitgl_sys_draw_iaabb(full_iaabb, sky_col);
 }
 
-static void draw_floors(whitgl_fvec *player_pos, whitgl_fmat view, whitgl_fmat persp) {
-
-    for (int x = (int)MAX(0.0f, player_pos->x - MAX_DIST); x < (int)MIN(MAP_WIDTH, player_pos->x + MAX_DIST); x++) {
-        for (int y = (int)MAX(0.0f, player_pos->y - MAX_DIST); y < (int)MIN(MAP_HEIGHT, player_pos->y + MAX_DIST); y++) {
-            if (MAP_TILE(&map, x, y) == 0) {
-                whitgl_ivec pos = {x, y};
-                draw_floor(pos, view, persp, false);
-            }
-        }
-    }
-}
-
-static void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitgl_fmat persp)
-{
-    int n_drawn = 0;
-    bool *drawn = (bool*)malloc(sizeof(bool) * map.w * map.h);
-    memset(drawn, false, sizeof(bool) * map.w * map.h);
-    double fov = whitgl_pi / 2 * (double)SCREEN_W/(double)SCREEN_H;
-    double ray_step = fov / (double) SCREEN_W;
-
-    for (int i = 0; i < (SCREEN_W); i++) {
-        whitgl_fvec ray_direction;
-        double next_x, next_y;
-        double step_x, step_y;
-        double max_x, max_y;
-        double ray_angle;
-        double dx, dy;
-        int x, y;
-
-        ray_angle = angle + -fov/2.0 + ray_step * i;
-        ray_direction.x = cos(ray_angle);
-        ray_direction.y = sin(ray_angle);
-
-        x = position->x;
-        y = position->y;
-
-        step_x = _sign(ray_direction.x);
-        step_y = _sign(ray_direction.y);
-
-        next_x = x + (step_x > 0 ? 1 : 0);
-        next_y = y + (step_y > 0 ? 1 : 0);
-
-        max_x = (next_x - position->x) / ray_direction.x;
-        max_y = (next_y - position->y) / ray_direction.y;
-
-        if (isnan(max_x))
-                max_x = INFINITY;
-        if (isnan(max_y))
-                max_y = INFINITY;
-
-        dx = step_x / ray_direction.x;
-        dy = step_y / ray_direction.y;
-
-        if (isnan(dx))
-                dx = INFINITY;
-        if (isnan(dy))
-                dy = INFINITY;
-
-        bool draw = false;
-        for (;;) {
-            if (!tile_walkable[MAP_TILE(&map, x, y)]) {
-                draw = true;
-                break;
-            }
-
-            if (max_x < max_y) {
-                max_x += dx;
-                x += step_x;
-            } else {
-                if(max_y < MAX_DIST) {
-                    max_y += dy;
-                    y += step_y;
-                } else {
-                    break;
-                }
-            }
-        }
-        if (!drawn[y * map.h + x] && draw) {
-            whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(MAP_TILE(&map, x, y), pos, view, persp);
-            n_drawn++;
-            drawn[y * map.h + x] = true;
-        }
-    }
-    free(drawn);
-    //WHITGL_LOG("n_drawn: %d", n_drawn);
-}
-
 static void draw_crosshairs() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
     whitgl_iaabb box1 = {{crosshairs_pos.x - 1, crosshairs_pos.y - 4}, {crosshairs_pos.x + 1, crosshairs_pos.y + 4}};
@@ -457,23 +352,14 @@ static void frame(player_t *p, int cur_note)
 
     whitgl_sys_enable_depth(true);
 
-    whitgl_float fov = whitgl_pi/2;
-    whitgl_fmat perspective = whitgl_fmat_perspective(fov, (float)SCREEN_W/(float)SCREEN_H, 0.1f, 100.0f);
-    //whitgl_fmat perspective = whitgl_fmat_orthographic(-5.0f, 5.0f, 5.0f, -5.0f, -5.0f, 5.0f);
-    whitgl_fvec3 up = {0,0,-1};
-    whitgl_fvec3 camera_pos = {pov_pos.x, pov_pos.y, 0.5f};
-    whitgl_fvec3 camera_to = {camera_pos.x + player->look_facing.x, camera_pos.y + player->look_facing.y,0.5f};
-    whitgl_fmat view = whitgl_fmat_lookAt(camera_pos, camera_to, up);
+
     //whitgl_fmat model_matrix = whitgl_fmat_translate(camera_to);
     //model_matrix = whitgl_fmat_multiply(model_matrix, whitgl_fmat_rot_z(time*3));
 
     //whitgl_sys_draw_model(0, WHITGL_SHADER_MODEL, model_matrix, view, perspective);
-    whitgl_fvec3 skybox_pos = camera_pos;
-    skybox_pos.z = -2.5f;
-    //draw_skybox(skybox_pos, view, perspective);
-    raycast(&pov_pos, p->look_angle * whitgl_pi / 128.0f, view, perspective);
-    draw_floors(&pov_pos, view, perspective);
-    draw_rats(view, perspective);
+    float angle = p->look_angle * whitgl_pi / 128.0f;
+    draw_environment(pov_pos, angle, &map);
+    draw_entities(pov_pos, angle);
 
     whitgl_sys_enable_depth(false);
 
@@ -571,6 +457,7 @@ static int player_update(player_t *p, int note)
     }
 
     if (p->targeted_rat != -1) {
+        midi_set_player(p, &map);
         return GAME_STATE_MIDI;
     }
 

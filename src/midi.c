@@ -21,6 +21,8 @@
 
 #include "midi-parser.h"
 #include "midi.h"
+#include "game.h"
+#include "graphics.h"
 #include "music.h"
 #include "rat.h"
 
@@ -35,6 +37,7 @@ typedef struct note_t {
 double time;
 note_t notes[MIDI_LEN] = {{false}};
 static player_t *player;
+static map_t *map;
 
 int damage_to_deal;
 static int prev_music_beat; // What the cur_note was last time we updated
@@ -96,9 +99,9 @@ void midi_init() {
     printf("Initializing MIDI gamestate\n");
     //parse_file("/home/david/gdrive/projects/deadbeef-facade/midi-parser/sample.mid");
     parse_file("sample2.mid");
-    for (int i = 0; i < MIDI_LEN / 8; i++) {
+    for (int i = 1; i < MIDI_LEN / 8; i++) {
         notes[i * 8].exists = true;
-        notes[i * 8].chan = 0;//i % 4;
+        notes[i * 8].chan = i % 4;
         notes[i * 8].beat = i * 8;
     }
     time = 0.0;
@@ -250,8 +253,27 @@ static void draw_note_overlay() {
 }
 
 void midi_frame() {
+
+    whitgl_sys_color c = {0, 0, 128 * (note % 2), 0};
+    whitgl_set_shader_color(WHITGL_SHADER_EXTRA_0, 4, c);
+
+
     whitgl_sys_draw_init(0);
+    whitgl_sys_enable_depth(true);
+    whitgl_fvec pov_pos = {(float)player->look_pos.x / 256.0f + 0.5f, (float)player->look_pos.y / 256.0f + 0.5f};
+
+    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    float angle = (player->look_angle) * whitgl_pi / 128.0f;
+
+    draw_environment(pov_pos, angle, map);
+
     whitgl_sys_enable_depth(false);
     draw_note_overlay();
     whitgl_sys_draw_finish();
+}
+
+void midi_set_player(player_t *player_in, map_t *map_in) {
+    player = player_in;
+    map = map_in;
 }
