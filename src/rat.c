@@ -76,9 +76,9 @@ static void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp
 void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i]) {
-            whitgl_fvec rat_offset = {188 + 128 * rats[i]->anim->frametr.x, 87};
+            whitgl_fvec rat_offset = {128 + 64 * rats[i]->anim->frametr.x, 0};
             //whitgl_fvec rat_offset = {188, 87};
-            whitgl_fvec rat_size = {128, 128};
+            whitgl_fvec rat_size = {64, 128};
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 2, rat_offset);
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 3, rat_size);
             whitgl_fvec3 pos = {(float)rats[i]->look_pos.x / 256.0f + 0.5f, (float)rats[i]->look_pos.y / 256.0f + 0.5f, 0.5f};
@@ -164,7 +164,7 @@ bool unobstructed(whitgl_ivec p1, whitgl_ivec p2, map_t *map) {
     return line_of_sight_exists(p11, p21, map) && line_of_sight_exists(p12, p22, map);
 }
 
-static bool rat_try_move(rat_t *r, whitgl_ivec target, map_t *map) {
+bool rat_try_move(rat_t *r, whitgl_ivec target, map_t *map) {
     if (!tile_walkable[MAP_TILE(map, target.x, target.y)] || 
             MAP_ENTITY(map, target.x, target.y) != ENTITY_TYPE_NONE) {
         return false;
@@ -207,21 +207,25 @@ void rats_on_note(struct player_t *p, int note, bool use_astar, map_t *map) {
     }
 }
 
+void rat_update(int rat_idx) {
+    if (rats[rat_idx]) {
+        rat_t *r = rats[rat_idx];
+        if (r->pos.x * 256 > r->look_pos.x) {
+            r->look_pos.x += 32;
+        } else if (r->pos.x * 256 < r->look_pos.x) {
+            r->look_pos.x -= 32;
+        }
+        if (r->pos.y * 256 > r->look_pos.y) {
+            r->look_pos.y += 32;
+        } else if (r->pos.y * 256 < r->look_pos.y) {
+            r->look_pos.y -= 32;
+        }
+    }
+}
+
 void rats_update(struct player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map) {
     for (int i = 0; i < MAX_N_RATS; i++) {
-        if (rats[i]) {
-            rat_t *r = rats[i];
-            if (r->pos.x * 256 > r->look_pos.x) {
-                r->look_pos.x += 32;
-            } else if (r->pos.x * 256 < r->look_pos.x) {
-                r->look_pos.x -= 32;
-            }
-            if (r->pos.y * 256 > r->look_pos.y) {
-                r->look_pos.y += 32;
-            } else if (r->pos.y * 256 < r->look_pos.y) {
-                r->look_pos.y -= 32;
-            }
-        }
+        rat_update(i);
     }
 }
 

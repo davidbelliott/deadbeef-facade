@@ -195,25 +195,49 @@ int midi_update(float dt) {
         if (note >= MIDI_LEN) {
             return GAME_STATE_GAME;
         }
+
+        if (note % (NOTES_PER_MEASURE / 8) == 0) {
+            anim_objs_update();
+        }
         prev_music_beat = next_music_beat;
     }
+    rat_update(player->targeted_rat);
     return GAME_STATE_MIDI;
+}
+
+static void draw_note_bg() {
+    whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
+
+    int r = 128 * (MIDI_LEN - note) / MIDI_LEN;
+    int w = 64 * (MIDI_LEN - note) / MIDI_LEN;
+    whitgl_sys_color bg = {r, 0, 128 - r, 255};
+    whitgl_sys_color border = {255, 255, 255, 255};
+
+    whitgl_iaabb cross1 = {{SCREEN_W / 2 - w, 0}, {SCREEN_W / 2 + w, SCREEN_H}};
+    whitgl_iaabb cross2 = {{0, SCREEN_H / 2 - w}, {SCREEN_W, SCREEN_H / 2 + w}};
+    whitgl_sys_draw_iaabb(cross1, bg);
+    whitgl_sys_draw_iaabb(cross2, bg);
 }
 
 static void draw_note_overlay() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
-    whitgl_iaabb box = {{crosshairs_pos.x - 8, crosshairs_pos.y - 8}, {crosshairs_pos.x + 8, crosshairs_pos.y + 8}};
-
     whitgl_sys_color border = {255, 255, 255, 255};
+    whitgl_sys_color bg = {0, 0, 255, 255};
+    whitgl_sys_color black = {0, 0, 0, 255};
+
+    whitgl_iaabb bg_box = {{crosshairs_pos.x - 32, crosshairs_pos.y - 32}, {crosshairs_pos.x + 32, crosshairs_pos.y + 32}};
+    //whitgl_sys_draw_iaabb(bg_box, black);
+
+    whitgl_iaabb box = {{crosshairs_pos.x - 8, crosshairs_pos.y - 8}, {crosshairs_pos.x + 8, crosshairs_pos.y + 8}};
     box.a.y -= 16;
     box.b.y -= 16;
-    whitgl_sys_draw_hollow_iaabb(box, 1, border);
+    whitgl_sys_draw_iaabb(box, bg);
     box.a.y += 16;
     box.b.y += 16;
     box.a.x -= 16;
     box.b.x -= 16;
     for (int i = 0; i < 3; i++) {
-        whitgl_sys_draw_hollow_iaabb(box, 1, border);
+        whitgl_sys_draw_iaabb(box, bg);
         box.a.x += 16;
         box.b.x += 16;
     }
@@ -269,6 +293,8 @@ void midi_frame() {
     draw_environment(pov_pos, angle, map);
 
     whitgl_sys_enable_depth(false);
+    draw_note_bg();
+    draw_entities(pov_pos, angle);
     draw_note_overlay();
     whitgl_sys_draw_finish();
 }
@@ -276,4 +302,6 @@ void midi_frame() {
 void midi_set_player(player_t *player_in, map_t *map_in) {
     player = player_in;
     map = map_in;
+    rat_t *r = rat_get(player->targeted_rat);
+    rat_try_move(r, whitgl_ivec_add(player->pos, player->facing), map);
 }

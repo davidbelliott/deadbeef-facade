@@ -28,7 +28,9 @@ int get_closest_visible_rat(whitgl_ivec player_pos, map_t *map);
 void rats_prune(player_t *p, map_t *m);
 void draw_rats(whitgl_fmat view, whitgl_fmat persp);
 void rats_on_note(player_t *p, int note, bool use_astar, map_t *map);
+void rat_update(int idx);
 void rats_update(player_t *p, unsigned int dt, int cur_note, bool use_astar, map_t *map);
 void rats_destroy_all(player_t *p, map_t *m);
+bool rat_try_move(rat_t *r, whitgl_ivec target, map_t *map);
 
 #endif // RAT_H
