@@ -8,8 +8,9 @@ MODEL_OBJ = $(wildcard data/obj/*.obj)
 MODEL_WMD = $(MODEL_OBJ:.obj=.wmd)
 
 PROGRAM = dbbp
+PNG = data/tex/tex.png data/lvl/lvl1.png
 
-all: $(PROGRAM) $(MODEL_WMD) data/tex/tex.png
+all: $(PROGRAM) $(MODEL_WMD) $(PNG)
 
 $(PROGRAM): $(OBJ)
 	gcc -o $@ $^ $(LDFLAGS)
@@ -20,8 +21,8 @@ $(PROGRAM): $(OBJ)
 $(MODEL_WMD): $(MODEL_OBJ)
 	./whitgl/scripts/process_model.py $(@:.wmd=.obj) $@ 
 
-data/tex/tex.png: data/tex/tex.bmp
-	convert data/tex/tex.bmp data/tex/tex.png
+%.png: %.bmp
+	convert $< $@
 
 .PHONY: clean
 clean:

@@ -24,20 +24,32 @@ int _sign(double x) {
 	}
 }
 
-int tile_lvl_rgb[N_TILE_TYPES][4] = {
-    {0, 0, 0},
-    {0, 0, 127},
-    {127, 0, 0},
-    {0, 0, 255},
-    {0, 255, 255},
+int tile_lvl_rgb[][3] = {
+    {0, 0, 0},      // TILE_TYPE_FLOOR
+    {0, 0, 127},    // TILE_TYPE_BBRICK
+    {127, 0, 0},    // TILE_TYPE_RBRICK
+    {0, 127, 255},  // TILE_TYPE_STONE
+    {0, 255, 255},  // TILE_TYPE_PORTAL
+    {255, 0, 0},    // TILE_TYPE_RDOOR
+    {0, 255, 0},    // TILE_TYPE_GDOOR
+    {0, 0, 255}     // TILE_TYPE_BDOOR
+};
+
+int entity_lvl_rgb[N_ENTITY_TYPES][3] = {
+    {0, 0, 0},          // ENTITY_TYPE_NONE
+    {255, 255, 127},    // ENTITY_TYPE_PLAYER
+    {255, 255, 0},      // ENTITY_TYPE_RAT
 };
 
 int tile_tex_offset[N_TILE_TYPES][2] = {
-    {0, 0},
-    {0, 0},
-    {256, 0},
-    {320, 0},
-    {384, 0}
+    {0, 0},         // TILE_TYPE_FLOOR
+    {0, 0},         // TILE_TYPE_BBRICK
+    {256, 0},       // TILE_TYPE_RBRICK
+    {320, 0},       // TILE_TYPE_STONE
+    {384, 0},       // TILE_TYPE_PORTAL
+    {384, 0},       // TILE_TYPE_RDOOR
+    {448, 0},       // TILE_TYPE_GDOOR
+    {512, 0}        // TILE_TYPE_BDOOR
 };
 
 bool tile_walkable[N_TILE_TYPES] = {

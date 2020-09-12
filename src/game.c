@@ -25,13 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-char notification[64];
-whitgl_sys_color notif_col;
-int notif_update_time;
-
-char instruction[1024] = "";
-int instr_update_time;
-
 int lvl_grace_period = 64;
 
 #define MOVE_NONE       0
@@ -121,7 +114,7 @@ void game_load_level(char *levelname, map_t *map) {
     map->entities = (unsigned char*)malloc(sizeof(unsigned char) * w * h);
     memset(map->tiles, 0, sizeof(unsigned char) * w * h);
 
-    int data_idx, tile;
+    int data_idx, tile, entity;
     for (int i = 0; i < w * h; i++) {
         data_idx = 4 * i;
         tile = 0;
@@ -134,21 +127,32 @@ void game_load_level(char *levelname, map_t *map) {
             }
         }
         map->tiles[i] = tile;
-        map->entities[i] = ENTITY_TYPE_NONE;
+        entity = ENTITY_TYPE_NONE;
+        for (int j = 0; j < N_ENTITY_TYPES; j++) {
+            if (entity_lvl_rgb[j][0] == data[data_idx]
+                    && entity_lvl_rgb[j][1] == data[data_idx + 1]
+                    && tile_lvl_rgb[j][2] == data[data_idx + 2]) {
+                entity = j;
+                break;
+            }
+        }
+        map->entities[i] = entity;
+
+        whitgl_ivec pos = {i / map->w, i % map->w};
+        switch (entity) {
+            case ENTITY_TYPE_NONE:
+                break;
+            case ENTITY_TYPE_PLAYER:
+                player_create(pos, 0);
+                break;
+            case ENTITY_TYPE_RAT:
+                rat_create(pos, map);
+                break;
+            default:
+                printf("Not recognized\n");
+                break;
+        }
     }
-}
-
-void notify(const char *str, whitgl_sys_color color) {
-    strncpy(notification, str, 64);
-    notification[64] = 0;
-    notif_update_time = note;
-    notif_col = color;
-}
-
-void instruct(const char *str) {
-    strncpy(instruction, str, 1024);
-    notification[1024] = 0;
-    instr_update_time = note;
 }
 
 void game_free_level(map_t *map) {
@@ -235,57 +239,14 @@ static void draw_overlay(int cur_note) {
     draw_note_overlay();
 
     // Draw top bar
-    int most_recent_note = note % 8;
-    whitgl_sys_color fill_a = {0, 0, 128, 255};
-    whitgl_sys_color fill_b = {128, 0, 0, 255};
-    whitgl_sys_color top_col = most_recent_note < 2 ? fill_b : fill_a;
-    whitgl_iaabb top_iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
-    char path[256] = "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: 60]";
-    draw_window(path, top_iaabb, top_col);
+    draw_top_bar(cur_note);
 
     // Draw health bar
-    int elapsed = note - player->last_damage;
-    if (elapsed < 0) {
-        elapsed += music_get_song_len();
-    }
-    int blue_val = (elapsed < 8 ? 255.0 / (8.0 - elapsed) : 255);
-    int red_val = 255 - blue_val;
-    whitgl_sys_color col = {red_val, 0, blue_val, 255};
-    whitgl_iaabb bottom_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W, SCREEN_H}};
-    whitgl_iaabb health_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
-    whitgl_sys_color black = {0, 0, 0, 255};
-    char health[256];
-    snprintf(health, 256, "HEALTH: %d", player->health);
-    whitgl_sys_draw_iaabb(bottom_iaabb, black);
-    draw_window(health, health_iaabb, col);
+    draw_health_bar(cur_note, player);
 
-    if (note - notif_update_time < 8) {
-        int notif_width = FONT_CHAR_W * strlen(notification);
-        int top_y = SCREEN_H / 2 + (note - notif_update_time) * FONT_CHAR_H;
-        whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
-                     {SCREEN_W / 2 + notif_width / 2, top_y + FONT_CHAR_H}};
-        draw_window(notification, notif_iaabb, notif_col);
-    }
+    draw_notif(note);
 
-    if (note - instr_update_time < 128) {
-        int instr_width = SCREEN_W / 2;
-        int top_y = 2 * FONT_CHAR_H;
-        whitgl_iaabb instr_iaabb = {{SCREEN_W / 2 - instr_width / 2, top_y},
-            {SCREEN_W / 2 + instr_width / 2, top_y + 4 * FONT_CHAR_H}};
-        whitgl_iaabb text_iaabb = {{instr_iaabb.a.x, instr_iaabb.a.y + FONT_CHAR_H},
-            instr_iaabb.b};
-
-        char wrapped[1024];
-        wrap_text(instruction, wrapped, 1024, text_iaabb);
-        whitgl_sys_color border = {0, 0, 128, 255};
-        whitgl_sys_color fill = {0, 0, 0, 255};
-        whitgl_sys_draw_iaabb(instr_iaabb, border);
-        whitgl_ivec title_pos = {text_iaabb.a.x, instr_iaabb.a.y};
-        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-        whitgl_sys_draw_text(font, "INSTR:data/lvl/lvl1.json", title_pos);
-        whitgl_sys_draw_iaabb(text_iaabb, fill);
-        draw_str_with_newlines(wrapped, 1024, text_iaabb.a);
-    }
+    draw_instr(note);
 }
 
 static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat projection) {
@@ -389,7 +350,7 @@ static void frame(player_t *p, int cur_note)
 }
 
 
-void player_deal_damage(player_t *p, int dmg) {
+void player_deal_damage(player_t *p, int dmg, int note) {
     p->last_damage = note;
     p->health = MAX(0, p->health - dmg);
 }
@@ -399,8 +360,8 @@ static void player_on_note(player_t *p, int note) {
         if (note >= lvl_grace_period) {
             if (!p->moved) {
                 whitgl_sys_color col = {128, 0, 0, 255};
-                notify("YOU DIDN'T MOVE!", col);
-                player_deal_damage(p, 2);
+                notify(note, "YOU DIDN'T MOVE!", col);
+                player_deal_damage(p, 2, note);
             }
             p->moved = false;
         }
@@ -417,7 +378,7 @@ static void player_on_note(player_t *p, int note) {
         else
             strncpy(str, "GO!", 64);
         whitgl_sys_color black = {0, 0, 0, 255};
-        notify(str, black);
+        notify(note, str, black);
     }
 }
 
@@ -519,15 +480,15 @@ void game_input()
         whitgl_sys_color black = {0, 0, 0, 255};
         printf("Best notes: %d\n", best_n_notes);
         if (best_n_notes <= 1) {
-            notify("GOOD", black);
+            notify(note, "GOOD", black);
             p->move_goodness = 2;
             p->health = MIN(100, p->health + 1);
         } else if (best_n_notes <= 2) {
-            notify("MEDIOCRE", black);
+            notify(note, "MEDIOCRE", black);
             p->move_goodness = 1;
         } else {
-            notify("BAD", black);
-            player_deal_damage(p, 2);
+            notify(note, "BAD", black);
+            player_deal_damage(p, 2, note);
             p->move_goodness = 0;
         }
 
@@ -539,8 +500,8 @@ void game_input()
                 MAP_SET_ENTITY(&map, newpos.x, newpos.y, ENTITY_TYPE_PLAYER);
             } else {
                 whitgl_sys_color red = {128, 0, 0, 255};
-                notify("You crashed!", red);
-                player_deal_damage(p, 5);
+                notify(note, "You crashed!", red);
+                player_deal_damage(p, 5, note);
             }
         }
     }
@@ -555,18 +516,6 @@ void game_init() {
 
     level = 1;
     game_load_level("data/lvl/lvl1.png", &map);
-
-    whitgl_ivec p_pos = {2, 2};
-    player_create(p_pos, 0);
-    rat_create(p_pos, &map);
-    for (int x = 0; x < MAP_WIDTH; x++) {
-        for (int y = 0; y < MAP_HEIGHT; y++) {
-            if (rand() % 150 == 0 && MAP_TILE(&map, x, y) == 0) {
-                whitgl_ivec rat_pos = {x, y};
-                //rat_create(rat_pos, &map);
-            }
-        }
-    }
 }
 
 void game_cleanup() {
@@ -579,7 +528,7 @@ void game_start() {
     music_play_from_beginning(AMBIENT_MUSIC);
     note = 0;
     prev_note = music_get_cur_note();
-    instruct("Get ready to move to the chune so I can calibrate my Zune!");
+    instruct(note, "Get ready to move to the chune so I can calibrate my Zune!");
 }
 
 void game_stop() {
@@ -597,7 +546,6 @@ int game_update(float dt) {
             note += song_len - 1 - prev_note + next_note;
         //player_on_note(player, next_note);
         player_on_note(player, note);
-        printf("%d / %d\n", note, next_note);
         rats_on_note(player, note, true, &map);
         if (next_note % (NOTES_PER_MEASURE / 8) == 0) {
             anim_objs_update();

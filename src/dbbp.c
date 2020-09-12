@@ -334,9 +334,9 @@ int main(int argc, char* argv[])
         whitgl_float dt = 0;
         bool paused = false;
 
-        int game_state = GAME_STATE_INTRO;
+        int game_state = GAME_STATE_GAME;
         int next_state = game_state;
-        intro_start();
+        game_start();
 
 	while (running) {
             whitgl_sound_update();
@@ -357,6 +357,7 @@ int main(int argc, char* argv[])
                         break;
                     case GAME_STATE_MIDI:
                         next_state = midi_update(dt);
+                        midi_input();
                         break;
                     default:
                         break;

@@ -1,12 +1,23 @@
 #include "graphics.h"
 #include "common.h"
 #include "rat.h"
+#include "game.h"
+#include "music.h"
 
 #include <whitgl/sys.h>
+#include <whitgl/timer.h>
 
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
+
+char notification[64];
+whitgl_sys_color notif_col;
+int notif_update_time;
+
+char instruction[1024] = "";
+int instr_update_time;
 
 static void draw_floor(whitgl_ivec pos, whitgl_fmat view, whitgl_fmat persp, bool ceil) {
     whitgl_fvec3 draw_pos = {pos.x + 0.5f, pos.y + 0.5f, ceil ? -1.0f : 1.0f};
@@ -145,4 +156,82 @@ void draw_entities(whitgl_fvec pov_pos, float angle) {
     whitgl_fmat view = get_view(pov_pos, angle);
     whitgl_fmat persp = get_persp(whitgl_pi / 2.0f);
     draw_rats(view, persp);
+}
+
+void instruct(int note, const char *str) {
+    strncpy(instruction, str, 1024);
+    instruction[1024] = 0;
+    instr_update_time = note;
+}
+
+
+void notify(int note, const char *str, whitgl_sys_color color) {
+    strncpy(notification, str, 64);
+    notification[64] = 0;
+    notif_update_time = note;
+    notif_col = color;
+}
+
+void draw_notif(int note) {
+    if (note - notif_update_time < 8) {
+        int notif_width = FONT_CHAR_W * strlen(notification);
+        int top_y = SCREEN_H / 2 + (note - notif_update_time) * FONT_CHAR_H;
+        whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
+                     {SCREEN_W / 2 + notif_width / 2, top_y + FONT_CHAR_H}};
+        draw_window(notification, notif_iaabb, notif_col);
+    }
+}
+
+void clear_notif() {
+    notif_update_time = -8;
+}
+
+void draw_instr(int note) {
+    if (note - instr_update_time < 128) {
+        int instr_width = SCREEN_W / 2;
+        int top_y = 2 * FONT_CHAR_H;
+        whitgl_iaabb instr_iaabb = {{SCREEN_W / 2 - instr_width / 2, top_y},
+            {SCREEN_W / 2 + instr_width / 2, top_y + 4 * FONT_CHAR_H}};
+        whitgl_iaabb text_iaabb = {{instr_iaabb.a.x, instr_iaabb.a.y + FONT_CHAR_H},
+            instr_iaabb.b};
+
+        char wrapped[1024];
+        wrap_text(instruction, wrapped, 1024, text_iaabb);
+        whitgl_sys_color border = {0, 0, 128, 255};
+        whitgl_sys_color fill = {0, 0, 0, 255};
+        whitgl_sys_draw_iaabb(instr_iaabb, border);
+        whitgl_ivec title_pos = {text_iaabb.a.x, instr_iaabb.a.y};
+        whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
+        whitgl_sys_draw_text(font, "INSTR:data/lvl/lvl1.json", title_pos);
+        whitgl_sys_draw_iaabb(text_iaabb, fill);
+        draw_str_with_newlines(wrapped, 1024, text_iaabb.a);
+    }
+}
+
+void draw_top_bar(int note) {
+    int most_recent_note = note % 8;
+    whitgl_sys_color fill_a = {0, 0, 128, 255};
+    whitgl_sys_color fill_b = {128, 0, 0, 255};
+    whitgl_sys_color top_col = most_recent_note < 2 ? fill_b : fill_a;
+    whitgl_iaabb top_iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
+    char path[256];
+    snprintf(path, 256, "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: %d]", whitgl_timer_fps());
+    draw_window(path, top_iaabb, top_col);
+}
+
+void draw_health_bar(int note, player_t *player) {
+    int elapsed = note - player->last_damage;
+    if (elapsed < 0) {
+        elapsed += music_get_song_len();
+    }
+    int blue_val = (elapsed < 8 ? 255.0 / (8.0 - elapsed) : 255);
+    int red_val = 255 - blue_val;
+    whitgl_sys_color col = {red_val, 0, blue_val, 255};
+    whitgl_iaabb bottom_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W, SCREEN_H}};
+    whitgl_iaabb health_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
+    whitgl_sys_color black = {0, 0, 0, 255};
+    char health[256];
+    snprintf(health, 256, "[VITAL: %.2f]", player->health / 100.0);
+    whitgl_sys_draw_iaabb(bottom_iaabb, black);
+    draw_window(health, health_iaabb, col);
 }

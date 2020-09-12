@@ -23,7 +23,7 @@ typedef struct player_t {
     int move_goodness;
 } player_t;
 
-void player_deal_damage(player_t *p, int dmg);
+void player_deal_damage(player_t *p, int dmg, int note);
 
 void game_init();
 void game_from_midi();
@@ -36,6 +36,5 @@ int game_update(float dt);
 void game_input();
 void game_frame();
 void game_pause(bool paused);
-void notify(const char *str, whitgl_sys_color color);
 
 #endif

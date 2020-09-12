@@ -192,13 +192,13 @@ void rats_on_note(struct player_t *p, int note, bool use_astar, map_t *map) {
             if(rats[i]->path) {
                 astar_node_t *next_node = (astar_node_t*)rats[i]->path->data;
                 whitgl_ivec target = {next_node->pt.x, next_node->pt.y};
-                WHITGL_LOG("Following path -> (%f, %f)", target.x, target.y);
+                WHITGL_LOG("Following path -> (%d, %d)", target.x, target.y);
                 if (rat_try_move(rats[i], target, map)) {
                     astar_node_t *reached_node = pop_front(&rats[i]->path);
                     free(reached_node);
                 } else {
                     if (MAP_ENTITY(map, target.x, target.y) == ENTITY_TYPE_PLAYER)
-                        player_deal_damage(p, RAT_DAMAGE);
+                        player_deal_damage(p, RAT_DAMAGE, note);
                     astar_free_node_list(&rats[i]->path);
                     rats[i]->path = NULL;
                 }

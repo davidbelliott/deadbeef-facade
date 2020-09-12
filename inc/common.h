@@ -43,8 +43,8 @@ enum {
 #define MEASURES_PER_LOOP 4
 #define TOTAL_NUM_NOTES (NOTES_PER_MEASURE * MEASURES_PER_LOOP)
 #define NUM_LOOPS 16
-//#define BPM 117
-#define BPM 130
+#define BPM 117
+//#define BPM 130
 
 #define FONT_CHAR_W 9
 #define FONT_CHAR_H 16
@@ -87,14 +87,18 @@ enum {
 #define TILE_TYPE_RBRICK    2
 #define TILE_TYPE_STONE     3
 #define TILE_TYPE_PORTAL    4
-#define N_TILE_TYPES        5
+#define TILE_TYPE_RDOOR     5
+#define TILE_TYPE_GDOOR     6
+#define TILE_TYPE_BDOOR     7
+#define N_TILE_TYPES        8
 
 #define ENTITY_TYPE_NONE    0
 #define ENTITY_TYPE_PLAYER  1
 #define ENTITY_TYPE_RAT     2
 #define N_ENTITY_TYPES      3
 
-extern int tile_lvl_rgb[N_TILE_TYPES][4];
+extern int tile_lvl_rgb[N_TILE_TYPES][3];
+extern int entity_lvl_rgb[N_ENTITY_TYPES][3];
 extern int tile_tex_offset[N_TILE_TYPES][2];
 extern bool tile_walkable[N_TILE_TYPES];
 
