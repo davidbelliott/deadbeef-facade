@@ -43,8 +43,8 @@ enum {
 #define MEASURES_PER_LOOP 4
 #define TOTAL_NUM_NOTES (NOTES_PER_MEASURE * MEASURES_PER_LOOP)
 #define NUM_LOOPS 16
-#define BPM 117
-//#define BPM 130
+//#define BPM 117
+#define BPM 130
 
 #define FONT_CHAR_W 9
 #define FONT_CHAR_H 16

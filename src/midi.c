@@ -229,6 +229,36 @@ int midi_update(float dt) {
     return GAME_STATE_MIDI;
 }
 
+static whitgl_ivec get_note_pos(int i) {
+
+    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    int chan = notes[i].chan;
+    whitgl_ivec center_target_pos = {SCREEN_W / 2, SCREEN_H / 2};
+    int dx = 0;
+    int dy = 0;
+    if (chan == 0) {
+        center_target_pos.y -= NOTE_W;
+        dy = 1;
+    } else if (chan == 1) {
+        center_target_pos.x -= NOTE_W;
+        dx = 1;
+    } else if (chan == 2) {
+        dy = -1;
+    } else if (chan == 3) {
+        center_target_pos.x += NOTE_W;
+        dx = -1;
+    }
+    if (i <= note) {
+        return center_target_pos;
+    } else {
+        int x = center_target_pos.x + dx * (note - i + frac_since_note) * SCREEN_W / LOOKAHEAD_TIME;
+        int y = center_target_pos.y + dy * (note - i + frac_since_note) * SCREEN_W / LOOKAHEAD_TIME;
+        whitgl_ivec pos = {x, y};
+        return pos;
+    }
+}
+
 static void draw_note_bg() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
 
@@ -289,32 +319,14 @@ static void draw_note_overlay() {
 
     for (int i = MAX(note - BAD_N_NOTES, 0); i < MIN(MIDI_LEN, note + LOOKAHEAD_TIME); i++) {
         if (notes[i].exists) {
-            int chan = notes[i].chan;
-            int w = NOTE_W;// + NOTE_W * (i - note - frac_since_note);
-            whitgl_ivec center_target_pos = {SCREEN_W / 2, SCREEN_H / 2};
-            int dx = 0;
-            int dy = 0;
-            if (chan == 0) {
-                center_target_pos.y -= NOTE_W;
-                dy = 1;
-            } else if (chan == 1) {
-                center_target_pos.x -= NOTE_W;
-                dx = 1;
-            } else if (chan == 2) {
-                dy = -1;
-            } else if (chan == 3) {
-                center_target_pos.x += NOTE_W;
-                dx = -1;
-            }
+            whitgl_ivec center_pos = get_note_pos(i);
+            int x = center_pos.x - NOTE_W / 2;
+            int y = center_pos.y - NOTE_W / 2;
             if (i <= note) {
-                int x = center_target_pos.x - NOTE_W / 2;
-                int y = center_target_pos.y - NOTE_W / 2;
                 whitgl_iaabb iaabb = {{x, y}, {x + NOTE_W, y + NOTE_W}};
                 whitgl_sys_draw_iaabb(iaabb, border);
             } else {
-                int x = center_target_pos.x + dx * (note - i + frac_since_note) * SCREEN_W / LOOKAHEAD_TIME - w / 2;
-                int y = center_target_pos.y + dy * (note - i + frac_since_note) * SCREEN_W / LOOKAHEAD_TIME - w / 2;
-                whitgl_iaabb iaabb = {{x, y}, {x + w, y + w}};
+                whitgl_iaabb iaabb = {{x, y}, {x + NOTE_W, y + NOTE_W}};
                 whitgl_sys_draw_iaabb(iaabb, black);
                 whitgl_sys_draw_hollow_iaabb(iaabb, 1, border);
             }
@@ -345,6 +357,7 @@ void midi_frame() {
     whitgl_sys_enable_depth(false);
     draw_note_overlay();
     draw_notif(note);
+    draw_explosions(note);
     draw_top_bar(note);
     draw_health_bar(note, player);
     whitgl_sys_draw_finish();
@@ -381,6 +394,7 @@ void midi_input() {
             }
         }
         if (closest_note_idx != -1) {
+            add_explosion(note, get_note_pos(closest_note_idx));
             notes[closest_note_idx].exists = false;
 
             whitgl_sys_color black = {0, 0, 0, 255};

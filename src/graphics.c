@@ -11,6 +11,10 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+    
+#define MAX_N_EXPLOSIONS 16
+#define EXPLOSION_LIFE 8
+#define EXPLOSION_GROWTH_RATE 40
 
 char notification[64];
 whitgl_sys_color notif_col;
@@ -18,6 +22,14 @@ int notif_update_time;
 
 char instruction[1024] = "";
 int instr_update_time;
+
+typedef struct explosion_t {
+    bool exists;
+    whitgl_ivec pos;
+    int start_note;
+} explosion_t;
+
+explosion_t explosions[MAX_N_EXPLOSIONS] = {{0}};
 
 static void draw_floor(whitgl_ivec pos, whitgl_fmat view, whitgl_fmat persp, bool ceil) {
     whitgl_fvec3 draw_pos = {pos.x + 0.5f, pos.y + 0.5f, ceil ? -1.0f : 1.0f};
@@ -231,7 +243,44 @@ void draw_health_bar(int note, player_t *player) {
     whitgl_iaabb health_iaabb = {{0, SCREEN_H - FONT_CHAR_H}, {SCREEN_W * player->health / 100, SCREEN_H}};
     whitgl_sys_color black = {0, 0, 0, 255};
     char health[256];
-    snprintf(health, 256, "[VITAL: %.2f]", player->health / 100.0);
+    snprintf(health, 256, "[VIT: %.2f]", player->health / 100.0);
     whitgl_sys_draw_iaabb(bottom_iaabb, black);
     draw_window(health, health_iaabb, col);
+}
+
+void add_explosion(int note, whitgl_ivec screen_pos) {
+    int idx;
+    for (idx = 0; idx < MAX_N_EXPLOSIONS; idx++) {
+        if (!explosions[idx].exists) {
+            break;
+        }
+    }
+    if (idx == MAX_N_EXPLOSIONS) {
+        return;
+    }
+    explosions[idx].exists = true;
+    explosions[idx].pos = screen_pos;
+    explosions[idx].start_note = note;
+}
+
+void draw_explosions(int note) {
+
+    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    for (int idx = 0; idx < MAX_N_EXPLOSIONS; idx++) {
+        if (explosions[idx].exists) {
+            if (explosions[idx].start_note > note ||
+                note - explosions[idx].start_note > EXPLOSION_LIFE) {
+                explosions[idx].exists = false;
+            } else {
+                whitgl_ivec pos = explosions[idx].pos;
+                int hsize = (note - explosions[idx].start_note + frac_since_note) * \
+                            EXPLOSION_GROWTH_RATE;
+                whitgl_iaabb box = {{pos.x - hsize, pos.y - hsize}, \
+                    {pos.x + hsize, pos.y + hsize}};
+                whitgl_sys_color white = {255, 255, 255, 255};
+                whitgl_sys_draw_hollow_iaabb(box, 1, white);
+            }
+        }
+    }
 }
