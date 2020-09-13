@@ -39,6 +39,9 @@ int entity_lvl_rgb[N_ENTITY_TYPES][3] = {
     {0, 0, 0},          // ENTITY_TYPE_NONE
     {255, 255, 127},    // ENTITY_TYPE_PLAYER
     {255, 255, 0},      // ENTITY_TYPE_RAT
+    {255, 0, 127},      // ENTITY_TYPE_RKEY
+    {0, 127, 0},        // ENTITY_TYPE_GKEY
+    {127, 0, 255}       // ENTITY_TYPE_BKEY
 };
 
 int tile_tex_offset[N_TILE_TYPES][2] = {

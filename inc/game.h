@@ -21,6 +21,7 @@ typedef struct player_t {
     bool moved;
     int move_time;
     int move_goodness;
+    unsigned int keys;
 } player_t;
 
 void player_deal_damage(player_t *p, int dmg, int note);

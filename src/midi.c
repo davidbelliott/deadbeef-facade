@@ -358,7 +358,7 @@ void midi_frame() {
     draw_note_overlay();
     draw_notif(note);
     draw_explosions(note);
-    draw_top_bar(note);
+    draw_top_bar(note, player);
     draw_health_bar(note, player);
     whitgl_sys_draw_finish();
 }

@@ -17,10 +17,12 @@ void clear_notif();
 void instruct(int note, const char *str);
 void draw_instr(int note);
 
-void draw_top_bar(int note);
+void draw_top_bar(int note, struct player_t *player);
 void draw_health_bar(int note, struct player_t *player);
 
 void add_explosion(int note, whitgl_ivec screen_pos);
 void draw_explosions(int note);
+
+void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp);
 
 #endif

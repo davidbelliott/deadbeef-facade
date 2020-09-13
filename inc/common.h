@@ -95,7 +95,10 @@ enum {
 #define ENTITY_TYPE_NONE    0
 #define ENTITY_TYPE_PLAYER  1
 #define ENTITY_TYPE_RAT     2
-#define N_ENTITY_TYPES      3
+#define ENTITY_TYPE_RKEY    3
+#define ENTITY_TYPE_GKEY    4
+#define ENTITY_TYPE_BKEY    5
+#define N_ENTITY_TYPES      6
 
 extern int tile_lvl_rgb[N_TILE_TYPES][3];
 extern int entity_lvl_rgb[N_ENTITY_TYPES][3];

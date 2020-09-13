@@ -3,6 +3,7 @@
 #include "map.h"
 #include "anim.h"
 #include "rat.h"
+#include "key.h"
 #include "intro.h"
 #include "midi.h"
 #include "music.h"
@@ -97,6 +98,7 @@ static void player_create(whitgl_ivec pos, unsigned int angle) {
     player->last_damage = -256;
     player->targeted_rat = -1;
     player->moved = false;
+    player->keys = 0;
 }
 
 void game_load_level(char *levelname, map_t *map) {
@@ -129,16 +131,16 @@ void game_load_level(char *levelname, map_t *map) {
         map->tiles[i] = tile;
         entity = ENTITY_TYPE_NONE;
         for (int j = 0; j < N_ENTITY_TYPES; j++) {
-            if (entity_lvl_rgb[j][0] == data[data_idx]
-                    && entity_lvl_rgb[j][1] == data[data_idx + 1]
-                    && tile_lvl_rgb[j][2] == data[data_idx + 2]) {
+            if (entity_lvl_rgb[j][0] == (int)data[data_idx]
+                    && entity_lvl_rgb[j][1] == (int)data[data_idx + 1]
+                    && entity_lvl_rgb[j][2] == (int)data[data_idx + 2]) {
                 entity = j;
                 break;
             }
         }
         map->entities[i] = entity;
 
-        whitgl_ivec pos = {i / map->w, i % map->w};
+        whitgl_ivec pos = {i % map->w, i / map->w};
         switch (entity) {
             case ENTITY_TYPE_NONE:
                 break;
@@ -147,6 +149,15 @@ void game_load_level(char *levelname, map_t *map) {
                 break;
             case ENTITY_TYPE_RAT:
                 rat_create(pos, map);
+                break;
+            case ENTITY_TYPE_RKEY:
+                key_create(pos, KEY_R, map);
+                break;
+            case ENTITY_TYPE_GKEY:
+                key_create(pos, KEY_G, map);
+                break;
+            case ENTITY_TYPE_BKEY:
+                key_create(pos, KEY_B, map);
                 break;
             default:
                 printf("Not recognized\n");
@@ -239,7 +250,7 @@ static void draw_overlay(int cur_note) {
     draw_note_overlay();
 
     // Draw top bar
-    draw_top_bar(cur_note);
+    draw_top_bar(cur_note, player);
 
     // Draw health bar
     draw_health_bar(cur_note, player);
@@ -356,6 +367,7 @@ void player_deal_damage(player_t *p, int dmg, int note) {
 }
 
 static void player_on_note(player_t *p, int note) {
+    // TODO: fix this so it uses music cur_note instead!
     if (note % 8 == 4) {
         if (note >= lvl_grace_period) {
             if (!p->moved) {
@@ -493,8 +505,28 @@ void game_input()
         }
 
         if (p->move == MOVE_FORWARD || p->move == MOVE_BACKWARD) {
-            if (tile_walkable[MAP_TILE(&map, newpos.x, newpos.y)]
-                    && !MAP_ENTITY(&map, newpos.x, newpos.y)) {
+            bool crash = true;
+            if (tile_walkable[MAP_TILE(&map, newpos.x, newpos.y)]) {
+                int entity = MAP_ENTITY(&map, newpos.x, newpos.y);
+                if (entity == ENTITY_TYPE_NONE) {
+                    crash = false;
+                } else if (entity == ENTITY_TYPE_RAT) {
+                    crash = true;
+                } else if (entity == ENTITY_TYPE_RKEY) {
+                    p->keys |= KEY_R;
+                    key_destroy(key_at(newpos));
+                    crash = false;
+                } else if (entity == ENTITY_TYPE_GKEY) {
+                    p->keys |= KEY_G;
+                    key_destroy(key_at(newpos));
+                    crash = false;
+                } else if (entity == ENTITY_TYPE_BKEY) {
+                    p->keys |= KEY_B;
+                    key_destroy(key_at(newpos));
+                    crash = false;
+                }
+            }
+            if (!crash) {
                 MAP_SET_ENTITY(&map, p->pos.x, p->pos.y, ENTITY_TYPE_NONE);
                 p->pos = newpos;
                 MAP_SET_ENTITY(&map, newpos.x, newpos.y, ENTITY_TYPE_PLAYER);
@@ -520,6 +552,7 @@ void game_init() {
 
 void game_cleanup() {
     rats_destroy_all(player, &map);
+    destroy_all_keys();
     player_destroy();
     game_free_level(&map);
 }

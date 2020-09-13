@@ -1,6 +1,7 @@
 #include "rat.h"
 #include "common.h"
 #include "game.h"
+#include "graphics.h"
 #include "astar.h"
 
 #include <whitgl/logging.h>
@@ -66,11 +67,6 @@ void rats_prune(player_t *p, map_t *m) {
             rat_destroy(rats[i], p, m);
         }
     }
-}
-
-static void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
-    whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
-    whitgl_sys_draw_model(2, WHITGL_SHADER_EXTRA_1, model_matrix, view, persp);
 }
 
 void draw_rats(whitgl_fmat view, whitgl_fmat persp) {

@@ -1,6 +1,7 @@
 #include "graphics.h"
 #include "common.h"
 #include "rat.h"
+#include "key.h"
 #include "game.h"
 #include "music.h"
 
@@ -168,6 +169,7 @@ void draw_entities(whitgl_fvec pov_pos, float angle) {
     whitgl_fmat view = get_view(pov_pos, angle);
     whitgl_fmat persp = get_persp(whitgl_pi / 2.0f);
     draw_rats(view, persp);
+    draw_keys(view, persp);
 }
 
 void instruct(int note, const char *str) {
@@ -220,14 +222,21 @@ void draw_instr(int note) {
     }
 }
 
-void draw_top_bar(int note) {
+void draw_top_bar(int note, player_t *player) {
     int most_recent_note = note % 8;
     whitgl_sys_color fill_a = {0, 0, 128, 255};
     whitgl_sys_color fill_b = {128, 0, 0, 255};
     whitgl_sys_color top_col = most_recent_note < 2 ? fill_b : fill_a;
     whitgl_iaabb top_iaabb = {{0, 0}, {SCREEN_W, FONT_CHAR_H}};
+    char key_str[4] = "   ";
+    if (player->keys & KEY_R)
+        key_str[0] = 'R';
+    if (player->keys & KEY_G)
+        key_str[1] = 'G';
+    if (player->keys & KEY_B)
+        key_str[2] = 'B';
     char path[256];
-    snprintf(path, 256, "[PATH: data/lvl/lvl1] [KEYS: RGB] [FPS: %d]", whitgl_timer_fps());
+    snprintf(path, 256, "[PATH: data/lvl/lvl1] [KEYS: %s] [FPS: %d]", key_str, whitgl_timer_fps());
     draw_window(path, top_iaabb, top_col);
 }
 
@@ -283,4 +292,9 @@ void draw_explosions(int note) {
             }
         }
     }
+}
+
+void draw_billboard(whitgl_fvec3 pos, whitgl_fmat view, whitgl_fmat persp) {
+    whitgl_fmat model_matrix = whitgl_fmat_translate(pos);
+    whitgl_sys_draw_model(2, WHITGL_SHADER_EXTRA_1, model_matrix, view, persp);
 }
