@@ -70,16 +70,19 @@ typedef struct vector2 {
 int _mod(int a, int b);
 float _fmod(float a, float b);
 int _sign(double x);
+void draw_text(char *text, whitgl_ivec pos);
 void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill);
 
 void draw_str_with_newlines(const char *text, int n_chars, whitgl_ivec pos);
 void wrap_text(const char *text, char *wrapped, int wrapped_len, whitgl_iaabb bounding_box);
 
 enum {
-    GAME_STATE_GAME = 0,
-    GAME_STATE_MENU = 1,
-    GAME_STATE_INTRO = 2,
-    GAME_STATE_MIDI = 3
+    GAME_STATE_GAME,
+    GAME_STATE_MENU,
+    GAME_STATE_INTRO,
+    GAME_STATE_MIDI,
+    GAME_STATE_PAUSE,
+    GAME_STATE_EXIT,
 };
 
 #define TILE_TYPE_FLOOR     0

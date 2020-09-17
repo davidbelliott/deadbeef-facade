@@ -1,4 +1,5 @@
 #include "common.h"
+#include "music.h"
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -15,13 +16,14 @@
 #define PER_CHAR_DELAY 0.02f
 
 //char text[] = "Sometimes a man gets mogged so hard he forgets to breathe. When life gives you a moment, you have to live in the moment. You're not Lindy, hunched by your bed typing into Vim. A man's fucked up on dark mode solarized cool command line life hacks, even though dark mode's for pussies. Is a man meant to live life staring into a dark grotto, or with his eyes trained on the bright savanna horizon scanning for prey?\n\nA man's gotta make a monument, a monument more lasting than bronze. A man dreams of saying on his deathbed, \"I knew I had it in me all along.\" How bitter it will be to admit you were wrong.";
-char text[] = "Cleaning the tire factory ain't easy, but captivity's worth the wage. Snap, Crackle, Pop, and Ape Man are the big bosses, and they make the best tires. They made a tire called Big Bertha, and it was the biggest damn tire you'd ever seen.\n\n[APE MAN] So many rats in the basement. It's intolerable. Time a man did something about it.\n\n-What's in it for me?\n\n[APE MAN] A prey of divers colors of needlework. It says, Employee of the year.\n\n-All right\n\n[APE MAN] Don't go alone. Take my Zune, and the chunes will guide and protect you.";
+static char text[] = "Cleaning the tire factory ain't easy. Snap, Crackle, Pop, and Ape Man are the big bosses, and they make the best tires. They made a tire called Big Bertha, and it was the biggest damn tire you'd ever seen.";
 
-char path_str[] = "data/lvl/lvl1.txt";
+static char path_str[] = "data/lvl/lvl1.txt";
 
-float elapsed_time;
-int text_chars;
-int next_gamestate;
+static float elapsed_time;
+static int text_chars;
+static int next_gamestate;
+static bool waiting_to_exit;
 
 void intro_init() {
     whitgl_sys_add_image(1, "data/intro/lvl1.png");
@@ -36,6 +38,7 @@ void intro_start() {
     elapsed_time = 0.0f;
     text_chars = 0;
     next_gamestate = GAME_STATE_INTRO;
+    waiting_to_exit = false;
 }
 
 int intro_update(float dt) {
@@ -48,7 +51,12 @@ int intro_update(float dt) {
         //whitgl_sound_play(0, 1, 1);
     }
     text_chars = new_text_chars;
-    return next_gamestate;
+    int cur_note = music_get_cur_note();
+    if (waiting_to_exit && cur_note % 64 == 0) {
+        return GAME_STATE_GAME;
+    } else {
+        return GAME_STATE_INTRO;
+    }
 }
 
 void intro_input() {
@@ -56,6 +64,7 @@ void intro_input() {
         if (text_chars != strlen(text)) {
             text_chars = strlen(text);
         } else {
+            waiting_to_exit = true;
             next_gamestate = GAME_STATE_GAME;
         }
     }
@@ -99,6 +108,13 @@ void intro_frame() {
     wrap_text(text, wrapped_text, wrapped_len, bounding_box);
     draw_str_with_newlines(wrapped_text, text_chars, bounding_box.a);
     free(wrapped_text);
+
+
+    if (waiting_to_exit && music_get_cur_note() % 8 < 4) {
+        whitgl_ivec pos = {FONT_CHAR_W, SCREEN_H - 2 * FONT_CHAR_H};
+        draw_text("WAITING...", pos);
+    }
+
     whitgl_sys_draw_finish();
 }
 

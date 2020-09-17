@@ -63,11 +63,15 @@ bool tile_walkable[N_TILE_TYPES] = {
     true
 };
 
+void draw_text(char *text, whitgl_ivec pos) {
+    whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
+    whitgl_sys_draw_text(font, text, pos);
+}
+
 void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill) {
     whitgl_sys_draw_iaabb(iaabb, fill);
-    whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
     whitgl_ivec text_pos = {iaabb.a.x, iaabb.a.y};
-    whitgl_sys_draw_text(font, title, text_pos);
+    draw_text(title, text_pos);
 }
 
 void draw_str_with_newlines(const char *text, int n_chars, whitgl_ivec pos) {

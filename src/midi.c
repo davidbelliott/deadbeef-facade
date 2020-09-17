@@ -99,7 +99,7 @@ static int parse_file(const char *path)
     parser.size  = st.st_size;
     parser.in    = mem;
 
-    translate_to_notes(&parser);
+    //translate_to_notes(&parser);
 
     munmap(mem, st.st_size);
     close(fd);
@@ -127,7 +127,7 @@ void midi_start() {
         notes[i].exists = false;
     }
     for (int i = 1; i < MIDI_LEN / 4; i++) {
-        notes[i * 4].exists = (rand() % 2 == 0);
+        notes[i * 4].exists = (rand() % 2 == 2 || i % 2 == 0);
         notes[i * 4].chan = rand() % 4;
         notes[i * 4].beat = i * 8;
     }
@@ -294,11 +294,11 @@ static void draw_note_bg() {
 static void draw_note_overlay() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
     whitgl_sys_color border = {255, 255, 255, 255};
-    whitgl_sys_color bg = {0, 0, 255, 128};
+    whitgl_sys_color bg = {0, 0, 255, 255};
     whitgl_sys_color black = {0, 0, 0, 255};
 
-    whitgl_iaabb bg_box = {{crosshairs_pos.x - 32, crosshairs_pos.y - 32}, {crosshairs_pos.x + 32, crosshairs_pos.y + 32}};
-    //whitgl_sys_draw_iaabb(bg_box, black);
+    whitgl_iaabb bg_box = {{crosshairs_pos.x - 30, crosshairs_pos.y - 30}, {crosshairs_pos.x + 30, crosshairs_pos.y + 30}};
+    whitgl_sys_draw_iaabb(bg_box, black);
 
     whitgl_iaabb box = {{crosshairs_pos.x - NOTE_W / 2, crosshairs_pos.y - NOTE_W / 2}, {crosshairs_pos.x + NOTE_W / 2, crosshairs_pos.y + NOTE_W / 2}};
     box.a.y -= NOTE_W;

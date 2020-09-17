@@ -8,7 +8,7 @@ MODEL_OBJ = $(wildcard data/obj/*.obj)
 MODEL_WMD = $(MODEL_OBJ:.obj=.wmd)
 
 PROGRAM = dbbp
-PNG = data/tex/tex.png data/lvl/lvl1.png
+PNG = data/tex/tex.png $(wildcard data/lvl/lvl*.png)
 
 all: $(PROGRAM) $(MODEL_WMD) $(PNG)
 

@@ -29,6 +29,7 @@ void player_deal_damage(player_t *p, int dmg, int note);
 void game_init();
 void game_from_midi();
 void game_cleanup();
+void game_set_level(int level);
 // Action to take when entering this from another state
 void game_start();
 // Action to take when leaving this for another state

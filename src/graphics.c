@@ -188,8 +188,10 @@ void notify(int note, const char *str, whitgl_sys_color color) {
 
 void draw_notif(int note) {
     if (note - notif_update_time < 8) {
+        float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+        float frac_since_note = music_get_time_since_note() / secs_per_note;
         int notif_width = FONT_CHAR_W * strlen(notification);
-        int top_y = SCREEN_H / 2 + (note - notif_update_time) * FONT_CHAR_H;
+        int top_y = SCREEN_H / 2 + (note - notif_update_time + frac_since_note) * 4;
         whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
                      {SCREEN_W / 2 + notif_width / 2, top_y + FONT_CHAR_H}};
         draw_window(notification, notif_iaabb, notif_col);

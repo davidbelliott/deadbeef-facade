@@ -96,8 +96,10 @@ list_t* astar(whitgl_ivec start, whitgl_ivec end, map_t *map) {
             int dy = offsets[(i + 1) % 4];
             if(     (dx != 0 || dy != 0) // not both zero
                     && x+dx < MAP_WIDTH && x+dx >= 0 && y+dy < MAP_HEIGHT && y+dy >= 0 // within bounds
-                    && MAP_TILE(map, x+dx, y+dy) == 0 && MAP_ENTITY(map, x+dx, y+dy) != ENTITY_TYPE_RAT) // no wall in target spot
-            {
+                    && MAP_TILE(map, x+dx, y+dy) == 0 &&
+                    (MAP_ENTITY(map, x+dx, y+dy) == ENTITY_TYPE_NONE ||
+                     MAP_ENTITY(map, x+dx, y+dy) == ENTITY_TYPE_PLAYER)) {
+                // no wall in target spot
                 /*if(q->pt.x == 9 && q->pt.y == 5)
                     printf("Found neighbor: (%d, %d)\n", x+dx, y+dy);*/
                 push_front(&s, astar_alloc_node(x+dx, y+dy, q));

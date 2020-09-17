@@ -53,6 +53,7 @@ enum {
 int earliest_active_note_offset = 0;
 int note = 0;
 int prev_note;
+bool should_pause;
 
 note_pop_text_t note_pop_text = { 0 };
 
@@ -99,6 +100,7 @@ static void player_create(whitgl_ivec pos, unsigned int angle) {
     player->targeted_rat = -1;
     player->moved = false;
     player->keys = 0;
+    player->move_time = -1;
 }
 
 void game_load_level(char *levelname, map_t *map) {
@@ -235,9 +237,9 @@ static void draw_note_overlay() {
         - music_get_time_since_note();
     float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
 
-    int width = SCREEN_W * frac_to_next_beat / 1;
+    int width = SCREEN_W * frac_to_next_beat / 2.0f;
     //int height = (SCREEN_H - 2 * FONT_CHAR_H) * frac_to_next_beat;
-    int height = SCREEN_W * frac_to_next_beat / 1;
+    int height = SCREEN_W * frac_to_next_beat / 2.0f;
 
     whitgl_sys_color white = {255, 255, 255, 255};
     whitgl_iaabb iaabb = {{SCREEN_W / 2 - width / 2, SCREEN_H / 2 - height / 2},
@@ -298,8 +300,12 @@ static whitgl_ivec point_project(whitgl_fvec3 pos, whitgl_fmat mv, whitgl_fmat p
 }
 
 static void draw_sky() {
+    int cur_note = music_get_cur_note();
+    int most_recent_beat = note % 8;
     whitgl_iaabb full_iaabb = {{0, 0}, {SCREEN_W, SCREEN_H}};
-    whitgl_sys_color sky_col = {0, 0, 30, 255};
+    whitgl_sys_color fill_a = {0, 0, 30, 255};
+    whitgl_sys_color fill_b = {30, 0, 0, 255};
+    whitgl_sys_color sky_col = most_recent_beat < 2 ? fill_b : fill_a;
 
     whitgl_sys_draw_iaabb(full_iaabb, sky_col);
 }
@@ -341,21 +347,23 @@ static void frame(player_t *p, int cur_note)
     draw_overlay(cur_note);
 
     // draw move overlay if needed
-    int elapsed = note - player->move_time;
-    int color_amt = (elapsed < 4 ? (4 - elapsed) * 64 : 0);
-    whitgl_sys_color c = {0, 0, 0, 0};
-    switch (p->move_goodness) {
-        case 2:
-            c.g = color_amt;
-            break;
-        case 1:
-            c.g = color_amt;
-        case 0:
-            c.r = color_amt;
-        default:
-            break;
+    if (player->move_time > 0) {
+        int elapsed = note - player->move_time;
+        int color_amt = (elapsed < 4 ? (4 - elapsed) * 64 : 0);
+        whitgl_sys_color c = {0, 0, 0, 0};
+        switch (p->move_goodness) {
+            case 2:
+                c.g = color_amt;
+                break;
+            case 1:
+                c.g = color_amt;
+            case 0:
+                c.r = color_amt;
+            default:
+                break;
+        }
+        whitgl_set_shader_color(WHITGL_SHADER_EXTRA_0, 4, c);
     }
-    whitgl_set_shader_color(WHITGL_SHADER_EXTRA_0, 4, c);
 
     whitgl_sys_draw_finish();
 }
@@ -368,7 +376,8 @@ void player_deal_damage(player_t *p, int dmg, int note) {
 
 static void player_on_note(player_t *p, int note) {
     // TODO: fix this so it uses music cur_note instead!
-    if (note % 8 == 4) {
+    int cur_note = music_get_cur_note();
+    if (cur_note % 8 == 4) {
         if (note >= lvl_grace_period) {
             if (!p->moved) {
                 whitgl_sys_color col = {128, 0, 0, 255};
@@ -377,7 +386,7 @@ static void player_on_note(player_t *p, int note) {
             }
             p->moved = false;
         }
-    } else if (note % 8 == 0 && note < lvl_grace_period) {
+    } else if (cur_note % 8 == 0 && note < lvl_grace_period) {
         int beats_left = (lvl_grace_period - note) / 8;
         char str[64];
         const char *template = "%d...";
@@ -420,12 +429,8 @@ static int player_update(player_t *p, int note)
     
     // Test for portals, doors, etc
     if (MAP_TILE(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
+        WHITGL_LOG("next level");
         level++;
-        char levelstr[256];
-        snprintf(levelstr, 256, "data/lvl/lvl%d.png", level);
-        intro_set_text(levelstr);
-        game_free_level(&map);
-        game_load_level(levelstr, &map);
         return GAME_STATE_INTRO;
     }
 
@@ -443,7 +448,11 @@ void game_pause(bool paused) {
 
 void game_input()
 {
-    int next_state = GAME_STATE_GAME;
+    if (whitgl_input_pressed(WHITGL_INPUT_ESC)) {
+        should_pause = true;
+    } else {
+        should_pause = false;
+    }
 
     player_t *p = player;
 
@@ -491,11 +500,11 @@ void game_input()
         whitgl_sys_color red = {128, 0, 0, 255};
         whitgl_sys_color black = {0, 0, 0, 255};
         printf("Best notes: %d\n", best_n_notes);
-        if (best_n_notes <= 1) {
+        if (best_n_notes == 0) {
             notify(note, "GOOD", black);
             p->move_goodness = 2;
             p->health = MIN(100, p->health + 1);
-        } else if (best_n_notes <= 2) {
+        } else if (best_n_notes <= 1) {
             notify(note, "MEDIOCRE", black);
             p->move_goodness = 1;
         } else {
@@ -525,6 +534,16 @@ void game_input()
                     key_destroy(key_at(newpos));
                     crash = false;
                 }
+            } else {
+                if ((MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_RDOOR && p->keys & KEY_R) ||
+                    (MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_GDOOR && p->keys & KEY_G) ||
+                    (MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_BDOOR && p->keys & KEY_B)) {
+                    // Unlock the door with a key
+                    MAP_SET_TILE(&map, newpos.x, newpos.y, TILE_TYPE_FLOOR);
+                    crash = false;
+                    whitgl_sys_color green = {0, 128, 0, 255};
+                    notify(note, "Door unlocked!", green);
+                }
             }
             if (!crash) {
                 MAP_SET_ENTITY(&map, p->pos.x, p->pos.y, ENTITY_TYPE_NONE);
@@ -532,8 +551,16 @@ void game_input()
                 MAP_SET_ENTITY(&map, newpos.x, newpos.y, ENTITY_TYPE_PLAYER);
             } else {
                 whitgl_sys_color red = {128, 0, 0, 255};
-                notify(note, "You crashed!", red);
-                player_deal_damage(p, 5, note);
+                if (MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_RDOOR)
+                    notify(note, "Door requires red key!", red);
+                else if (MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_GDOOR)
+                    notify(note, "Door requires green key!", red);
+                else if (MAP_TILE(&map, newpos.x, newpos.y) == TILE_TYPE_BDOOR)
+                    notify(note, "Door requires blue key!", red);
+                else {
+                    notify(note, "You crashed!", red);
+                    player_deal_damage(p, 5, note);
+                }
             }
         }
     }
@@ -546,8 +573,6 @@ void game_init() {
     whitgl_load_model(3, "data/obj/skybox.wmd");
     whitgl_load_model(4, "data/obj/ceil.wmd");
 
-    level = 1;
-    game_load_level("data/lvl/lvl1.png", &map);
 }
 
 void game_cleanup() {
@@ -557,11 +582,20 @@ void game_cleanup() {
     game_free_level(&map);
 }
 
+void game_set_level(int level_in) {
+    level = level_in;
+}
+
 void game_start() {
-    music_play_from_beginning(AMBIENT_MUSIC);
     note = 0;
     prev_note = music_get_cur_note();
     instruct(note, "Get ready to move to the chune so I can calibrate my Zune!");
+
+    char levelstr[256];
+    snprintf(levelstr, 256, "data/lvl/lvl%d.png", level);
+    WHITGL_LOG("Loading level: %s", levelstr);
+    //intro_set_text(levelstr);
+    game_load_level(levelstr, &map);
 }
 
 void game_stop() {
@@ -590,9 +624,13 @@ int game_update(float dt) {
     rats_update(player, dt, note, true, &map);
     rats_prune(player, &map);
 
-    return next_state;
+    if (should_pause) {
+        return GAME_STATE_PAUSE;
+    } else {
+        return next_state;
+    }
 }
 
 void game_frame() {
-    frame(player, note);
+    frame(player, music_get_cur_note());
 }
