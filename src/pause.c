@@ -19,6 +19,11 @@ void pause_cleanup() {
 void pause_start() {
     next_gamestate = GAME_STATE_PAUSE;
     selection = 0;
+    //music_set_paused(CUR_LVL_MUSIC, true);
+}
+
+void pause_stop() {
+    //music_set_paused(CUR_LVL_MUSIC, false);
 }
 
 int pause_update(float dt) {

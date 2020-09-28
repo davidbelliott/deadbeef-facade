@@ -4,6 +4,7 @@
 #include "title.h"
 #include "music.h"
 #include "pause.h"
+#include "ending.h"
 #include "common.h"
 
 #include <assert.h>
@@ -14,6 +15,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <whitgl/sound.h>
 #include <whitgl/input.h>
@@ -235,8 +237,10 @@ void input(bool *paused, bool *running, int game_state) {
     }*/
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
+        
+        srand(1);
+
         WHITGL_LOG("Starting main.");
         whitgl_sys_setup setup = whitgl_sys_setup_zero;
         setup.cursor = CURSOR_DISABLE;
@@ -244,9 +248,9 @@ int main(int argc, char* argv[])
         setup.size.y = SCREEN_H;
         setup.pixel_size = PIXEL_DIM;
         setup.resolution_mode = RESOLUTION_EXACT;
-        setup.fullscreen = false;
+        setup.fullscreen = true;
         setup.name = "main";
-        setup.resizable = false;
+        setup.resizable = true;
         if (!whitgl_sys_init(&setup))
             return 1;
 
@@ -296,11 +300,6 @@ int main(int argc, char* argv[])
             return 1;
 
 
-        /*whitgl_shader model_shader = whitgl_shader_zero;
-	model_shader.fragment_src = model_src;
-	if(!whitgl_change_shader(WHITGL_SHADER_MODEL, model_shader))
-            return 1;*/
-
 
         
         whitgl_sound_init();
@@ -321,8 +320,6 @@ int main(int argc, char* argv[])
         fspritesheet_size.y = (whitgl_float)spritesheet_size.y;
         whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_0, 1, fspritesheet_size);
         whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 1, fspritesheet_size);
-
-        whitgl_loop_add(0, "data/snd/metronome-short.ogg");
 
         music_init();
 
@@ -369,6 +366,10 @@ int main(int argc, char* argv[])
                         next_state = midi_update(dt);
                         midi_input();
                         break;
+                    case GAME_STATE_ENDING:
+                        next_state = ending_update(dt);
+                        ending_input();
+                        break;
                     case GAME_STATE_PAUSE:
                         next_state = pause_update(dt);
                         pause_input();
@@ -395,6 +396,9 @@ int main(int argc, char* argv[])
                 case GAME_STATE_MIDI:
                     midi_frame();
                     break;
+                case GAME_STATE_ENDING:
+                    ending_frame();
+                    break;
                 case GAME_STATE_PAUSE:
                     pause_frame();
                     break;
@@ -405,6 +409,7 @@ int main(int argc, char* argv[])
             if (next_state != game_state) {
                 if (game_state == GAME_STATE_MENU) {
                     if (next_state == GAME_STATE_INTRO) {
+                        title_stop();
                         intro_start();
                     }
                 } else if (game_state == GAME_STATE_INTRO) {
@@ -415,8 +420,18 @@ int main(int argc, char* argv[])
                     if (next_state == GAME_STATE_MIDI) {
                         midi_start();
                     } else if (next_state == GAME_STATE_INTRO) {
+                        music_set_paused(CUR_LVL_MUSIC, true);
                         game_cleanup();
                         intro_start();
+                    } else if (next_state == GAME_STATE_MENU) {
+                        music_set_paused(CUR_LVL_MUSIC, true);
+                        game_cleanup();
+                        game_set_level(1);
+                        title_start();
+                    } else if (next_state == GAME_STATE_ENDING) {
+                        game_cleanup();
+                        game_set_level(1);
+                        ending_start();
                     }
                 } else if (game_state == GAME_STATE_MIDI) {
                     if (next_state == GAME_STATE_GAME) {
@@ -424,9 +439,17 @@ int main(int argc, char* argv[])
                     }
                 } else if (game_state == GAME_STATE_PAUSE) {
                     if (next_state == GAME_STATE_MENU) {
-                        game_stop();
+                        music_set_paused(CUR_LVL_MUSIC, true);
                         game_cleanup();
                         game_set_level(1);
+                        title_start();
+                    } else if (next_state == GAME_STATE_GAME) {
+                        pause_stop();
+                    }
+                } else if (game_state == GAME_STATE_ENDING) {
+                    if (next_state == GAME_STATE_MENU) {
+                        music_set_paused(CUR_LVL_MUSIC, true);
+                        ending_cleanup();
                         title_start();
                     }
                 }

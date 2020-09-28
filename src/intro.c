@@ -9,6 +9,7 @@
 #include <whitgl/random.h>
 #include <whitgl/timer.h>
 
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,22 +17,22 @@
 #define PER_CHAR_DELAY 0.02f
 
 //char text[] = "Sometimes a man gets mogged so hard he forgets to breathe. When life gives you a moment, you have to live in the moment. You're not Lindy, hunched by your bed typing into Vim. A man's fucked up on dark mode solarized cool command line life hacks, even though dark mode's for pussies. Is a man meant to live life staring into a dark grotto, or with his eyes trained on the bright savanna horizon scanning for prey?\n\nA man's gotta make a monument, a monument more lasting than bronze. A man dreams of saying on his deathbed, \"I knew I had it in me all along.\" How bitter it will be to admit you were wrong.";
-static char text[] = "Cleaning the tire factory ain't easy. Snap, Crackle, Pop, and Ape Man are the big bosses, and they make the best tires. They made a tire called Big Bertha, and it was the biggest damn tire you'd ever seen.";
-
-static char path_str[] = "data/lvl/lvl1.txt";
+static char *text;
 
 static float elapsed_time;
 static int text_chars;
 static int next_gamestate;
 static bool waiting_to_exit;
+static int level;
 
 void intro_init() {
     whitgl_sys_add_image(1, "data/intro/lvl1.png");
     whitgl_sys_add_image(2, "data/lvl/lvl1.png");
+    level = 1;
 }
 
 void intro_cleanup() {
-
+    free(text);
 }
 
 void intro_start() {
@@ -39,6 +40,37 @@ void intro_start() {
     text_chars = 0;
     next_gamestate = GAME_STATE_INTRO;
     waiting_to_exit = false;
+
+    // Load text
+    char fname[256];
+    snprintf(fname, 256, "data/lvl/lvl%d/text.txt", level);
+    FILE *f = fopen(fname, "rb");
+    assert(f);
+    fseek(f, 0, SEEK_END);
+    long length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    text = malloc(length + 1);
+    text[length] = '\0';
+    assert(text);
+    fread(text, 1, length, f);
+    fclose(f);
+
+    if (level != 1) {
+        // Load music
+        char music_path[256];
+        snprintf(music_path, 256, "data/lvl/lvl%d/music.ogg", level);
+        whitgl_loop_add(CUR_LVL_MUSIC, music_path);
+
+        double bpm;
+        char bpm_path[256];
+        snprintf(bpm_path, 256, "data/lvl/lvl%d/bpm", level);
+        f = fopen(bpm_path, "r");
+        fscanf(f, "%lf", &bpm);
+        fclose(f);
+
+        // Start playing music
+        music_play_from_beginning(CUR_LVL_MUSIC, bpm);
+    }
 }
 
 int intro_update(float dt) {
@@ -81,11 +113,12 @@ void intro_frame() {
     whitgl_iaabb iaabb = {{FONT_CHAR_W, 0}, {SCREEN_W, FONT_CHAR_H}};
     whitgl_sys_color black = {0, 0, 0, 255};
     char path[256];
-    snprintf(path, 256, "TXT: %s", path_str);
+    snprintf(path, 256, "TXT: data/lvl/lvl%d/text.txt", level);
     draw_window(path, iaabb, col);
 
     whitgl_iaabb img_iaabb = {{SCREEN_W - 255 - FONT_CHAR_W, 0}, {SCREEN_W, FONT_CHAR_H}};
-    char img[] = "IMG: data/lvl1/ape-man.bmp";
+    char img[256];
+    snprintf(img, 256, "IMG: data/lvl/lvl%d/img.bmp", level);
     draw_window(img, img_iaabb, col);
 
     whitgl_sprite sprite = {1, {0,0},{256,256}};
@@ -124,4 +157,8 @@ void intro_pause(bool paused) {
 
 void intro_set_text(char *newtext) {
     strcpy(text, newtext);
+}
+
+void intro_set_level(int level_in) {
+    level = level_in;
 }

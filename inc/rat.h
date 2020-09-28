@@ -9,12 +9,14 @@ typedef struct rat_t {
     unsigned int id;
     int notes_between_update;
     int type;
+    int difficulty;
     whitgl_ivec pos;
     whitgl_ivec look_pos;
     anim_obj *anim;
     list_t *path;
     int health;
     bool dead;
+    bool boss;
 } rat_t;
 
 typedef struct player_t player_t;

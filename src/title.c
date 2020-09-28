@@ -1,8 +1,12 @@
 #include "common.h"
 #include "title.h"
 #include "music.h"
+
 #include <whitgl/sys.h>
 #include <whitgl/input.h>
+#include <whitgl/logging.h>
+
+#include <stdio.h>
 
 #define IMG_TITLE 3
 #define N_SELECTIONS 2
@@ -11,7 +15,6 @@ static int next_gamestate;
 static int selection;
 
 void title_init() {
-    whitgl_sys_add_image(IMG_TITLE, "data/title.png");
 }
 
 void title_cleanup() {
@@ -19,9 +22,19 @@ void title_cleanup() {
 }
 
 void title_start() {
-    music_play_from_beginning(AMBIENT_MUSIC);
+    whitgl_loop_add(CUR_LVL_MUSIC, "data/lvl/lvl1/music.ogg");
+
+    double bpm;
+    FILE *f = fopen("data/lvl/lvl1/bpm", "r");
+    fscanf(f, "%lf", &bpm);
+    fclose(f);
+    music_play_from_beginning(CUR_LVL_MUSIC, bpm);
     next_gamestate = GAME_STATE_MENU;
     selection = 0;
+}
+
+void title_stop() {
+    music_set_paused(AMBIENT_MUSIC, true);
 }
 
 int title_update(float dt) {
@@ -51,17 +64,20 @@ void title_input() {
 
 void title_frame() {
     whitgl_sys_draw_init(0);
+    whitgl_ivec screen_size = whitgl_sys_get_screen_size();
+    int w = screen_size.x / PIXEL_DIM;
+    int h = screen_size.y / PIXEL_DIM;
     whitgl_sys_enable_depth(false);
     
     whitgl_sys_color col = {0, 0, 128, 255};
-    whitgl_iaabb outer_box = {{0, 0}, {SCREEN_W, SCREEN_H}};
+    whitgl_iaabb outer_box = {{0, 0}, {w, h}};
     draw_window("", outer_box, col);
 
-    whitgl_iaabb iaabb = {{FONT_CHAR_W, 0}, {SCREEN_W, FONT_CHAR_H}};
+    whitgl_iaabb iaabb = {{FONT_CHAR_W, 0}, {w, FONT_CHAR_H}};
     whitgl_sys_color black = {0, 0, 0, 255};
     draw_window("0xDEADBEEF_FACADE", iaabb, col);
 
-    whitgl_iaabb bounding_box = {{FONT_CHAR_W, FONT_CHAR_H}, {SCREEN_W - FONT_CHAR_W, SCREEN_H - FONT_CHAR_H}};
+    whitgl_iaabb bounding_box = {{FONT_CHAR_W, FONT_CHAR_H}, {w - FONT_CHAR_W, h - FONT_CHAR_H}};
     draw_window("", bounding_box, black);
 
     whitgl_ivec pos = {FONT_CHAR_W * 2, FONT_CHAR_H * 2};

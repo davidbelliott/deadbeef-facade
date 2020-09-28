@@ -11,7 +11,7 @@ int key_create(whitgl_ivec pos, int type, map_t *map) {
     int i;
     for (i = 0; i < MAX_N_KEYS; i++) {
         if (!keys[i]) {
-            key_entity_t *key = (key_entity_t*)malloc(sizeof(key));
+            key_entity_t *key = (key_entity_t*)malloc(sizeof(key_entity_t));
             key->pos = pos;
             key->type = type;
             //MAP_SET_ENTITY(map, pos.x, pos.y, ENTITY_TYPE_KEY);

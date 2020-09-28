@@ -27,7 +27,7 @@
 #include "music.h"
 #include "rat.h"
 
-#define MIDI_LEN 127     // number of notes in this clip
+#define MAX_MIDI_LEN 1024     // number of notes in this clip
 
 #define NOTE_W 20
 
@@ -44,7 +44,7 @@ typedef struct note_t {
 } note_t;
 
 double time;
-note_t notes[MIDI_LEN] = {{false}};
+note_t notes[MAX_MIDI_LEN] = {{false}};
 static player_t *player;
 static map_t *map;
 
@@ -54,6 +54,9 @@ static int note;            // # of notes elapsed since starting the state
 
 static int last_move_note;  // note when the player last made a move
 
+int difficulty;
+int length;
+
 static void translate_to_notes(struct midi_parser *parser);
 
 static int vtime_to_beat(int16_t time_div, int64_t vtime) {
@@ -62,7 +65,7 @@ static int vtime_to_beat(int16_t time_div, int64_t vtime) {
         int8_t frames_per_sec = (time_div & 0x7F) >> 8;
         int8_t ticks_per_frame = (time_div & 0xFF);
         double time = (double)vtime / (double)(ticks_per_frame * frames_per_sec);
-        int beat = (int)(time * 60.0f * BPM * 8.0f);
+        int beat = (int)(time * 60.0f * music_get_cur_bpm() * 8.0f);
         return beat;
     } else {
         // Format: ticks per quarter note
@@ -111,6 +114,7 @@ void midi_init() {
     //parse_file("/home/david/gdrive/projects/deadbeef-facade/midi-parser/sample.mid");
     parse_file("sample2.mid");
     time = 0.0;
+    difficulty = DIFFICULTY_EASY;
 }
 
 void midi_cleanup() {
@@ -123,13 +127,34 @@ void midi_start() {
     prev_music_beat = music_get_cur_note();
     last_move_note = 0;
 
-    for (int i = 0; i < MIDI_LEN; i++) {
+    for (int i = 0; i < MAX_MIDI_LEN; i++) {
         notes[i].exists = false;
     }
-    for (int i = 1; i < MIDI_LEN / 4; i++) {
-        notes[i * 4].exists = (rand() % 2 == 2 || i % 2 == 0);
-        notes[i * 4].chan = rand() % 4;
-        notes[i * 4].beat = i * 8;
+    int main_interval;
+    int half_note_chance;
+    switch (difficulty) {
+        case DIFFICULTY_EASY:
+        default:
+            main_interval = 4;
+            half_note_chance = 8;
+            break;
+        case DIFFICULTY_MEDIUM:
+            main_interval = 4;
+            half_note_chance = 4;
+            break;
+        case DIFFICULTY_HARD:
+            main_interval = 4;
+            half_note_chance = 2;
+            break;
+        case DIFFICULTY_ADVANCED:
+            main_interval = 2;
+            half_note_chance = 2;
+            break;
+    }
+    for (int i = 1; i < MAX_MIDI_LEN / main_interval; i++) {
+        notes[i * main_interval].exists = (rand() % half_note_chance == 0 || i % 2 == 0);
+        notes[i * main_interval].chan = rand() % 4;
+        notes[i * main_interval].beat = i * main_interval;
     }
 
     clear_notif();
@@ -216,7 +241,7 @@ int midi_update(float dt) {
             player_deal_damage(player, 4, note);
         }
         note++;
-        if (note >= MIDI_LEN) {
+        if (note >= length) {
             return GAME_STATE_GAME;
         }
 
@@ -231,8 +256,7 @@ int midi_update(float dt) {
 
 static whitgl_ivec get_note_pos(int i) {
 
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    float frac_since_note = music_get_frac_since_note();
     int chan = notes[i].chan;
     whitgl_ivec center_target_pos = {SCREEN_W / 2, SCREEN_H / 2};
     int dx = 0;
@@ -263,7 +287,7 @@ static void draw_note_bg() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
 
     int r = 128 * (note % 2);
-    int w = SCREEN_H / 2 * (MIDI_LEN - note) / MIDI_LEN;
+    int w = SCREEN_H / 2 * (MAX_MIDI_LEN - note) / MAX_MIDI_LEN;
     //whitgl_sys_color bg = {r, 0, 128 - r, 255};
     whitgl_sys_color bg = {32, 0, 128, 255};
     whitgl_sys_color border = {255, 255, 255, 255};
@@ -314,10 +338,9 @@ static void draw_note_overlay() {
         box.b.x += NOTE_W;
     }
 
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    float frac_since_note = music_get_frac_since_note();
 
-    for (int i = MAX(note - BAD_N_NOTES, 0); i < MIN(MIDI_LEN, note + LOOKAHEAD_TIME); i++) {
+    for (int i = MAX(note - BAD_N_NOTES, 0); i < MIN(MAX_MIDI_LEN, note + LOOKAHEAD_TIME); i++) {
         if (notes[i].exists) {
             whitgl_ivec center_pos = get_note_pos(i);
             int x = center_pos.x - NOTE_W / 2;
@@ -334,6 +357,21 @@ static void draw_note_overlay() {
     }
 }
 
+void draw_countdown() {
+    int eighth_notes_remaining = (length - note) / 4;
+    char str[128];
+    float frac = (float)eighth_notes_remaining / (float)(length / 4);
+    snprintf(str, 128, "[ENEMY: %.2f]", frac);
+    int w = SCREEN_W * frac;
+    int top_y = FONT_CHAR_H;
+    whitgl_iaabb bg_iaabb = {{0, top_y}, {SCREEN_W, top_y + FONT_CHAR_H}};
+    whitgl_iaabb health_iaabb = {{0, top_y}, {w, top_y + FONT_CHAR_H}};
+    whitgl_sys_color black = {0, 0, 0, 255};
+    whitgl_sys_color health = {128, 0, 0, 255};
+    whitgl_sys_draw_iaabb(bg_iaabb, black);
+    draw_window(str, health_iaabb, health);
+}
+
 void midi_frame() {
 
     whitgl_sys_color c = {0, 0, 0, 0};
@@ -344,8 +382,7 @@ void midi_frame() {
     whitgl_sys_enable_depth(true);
     whitgl_fvec pov_pos = {(float)player->look_pos.x / 256.0f + 0.5f, (float)player->look_pos.y / 256.0f + 0.5f};
 
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float frac_since_note = music_get_time_since_note() / secs_per_note;
+    float frac_since_note = music_get_frac_since_note();
     float angle = (player->look_angle) * whitgl_pi / 128.0f;
 
     draw_environment(pov_pos, angle, map);
@@ -356,8 +393,9 @@ void midi_frame() {
     draw_entities(pov_pos, angle);
     whitgl_sys_enable_depth(false);
     draw_note_overlay();
-    draw_notif(note);
-    draw_explosions(note);
+    draw_countdown();
+    draw_notif(note, frac_since_note);
+    draw_explosions(note, frac_since_note);
     draw_top_bar(note, player);
     draw_health_bar(note, player);
     whitgl_sys_draw_finish();
@@ -384,7 +422,7 @@ void midi_input() {
     if (chan_pressed != -1) {
         int closest_note_idx = -1;
         int closest_dist = BAD_N_NOTES + 1;
-        for (int i = MAX(0, note - BAD_N_NOTES); i <= MIN(MIDI_LEN, note + BAD_N_NOTES); i++) {
+        for (int i = MAX(0, note - BAD_N_NOTES); i <= MIN(MAX_MIDI_LEN, note + BAD_N_NOTES); i++) {
             if (notes[i].exists && notes[i].chan == chan_pressed) {
                 int dist = abs(i - note);
                 if (dist < closest_dist) {
@@ -412,4 +450,9 @@ void midi_input() {
             last_move_note = note;
         }
     }
+}
+
+void midi_set_difficulty(int difficulty_in, int length_in) {
+    difficulty = difficulty_in;
+    length = length_in;
 }

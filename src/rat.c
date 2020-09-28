@@ -3,8 +3,10 @@
 #include "game.h"
 #include "graphics.h"
 #include "astar.h"
+#include "midi.h"
 
 #include <whitgl/logging.h>
+#include <whitgl/random.h>
 #include <stdlib.h>
 #include <math.h>
 
@@ -30,7 +32,10 @@ rat_t* rat_create(whitgl_ivec pos, map_t *map) {
             rat->path = NULL;
             rat->health = 50;
             rat->dead = false;
-            rat->notes_between_update = 16;
+            rat->boss = true;
+            rat->difficulty = DIFFICULTY_HARD;//rand() % DIFFICULTY_ADVANCED;
+            rat->notes_between_update = (rat->difficulty < DIFFICULTY_HARD ? 
+                    16 : 8);
 
             MAP_SET_ENTITY(map, pos.x, pos.y, ENTITY_TYPE_RAT);
             rats[rat->id] = rat;
@@ -72,7 +77,9 @@ void rats_prune(player_t *p, map_t *m) {
 void draw_rats(whitgl_fmat view, whitgl_fmat persp) {
     for (int i = 0; i < MAX_N_RATS; i++) {
         if (rats[i]) {
-            whitgl_fvec rat_offset = {128 + 64 * rats[i]->anim->frametr.x, 0};
+            int y_offset = rats[i]->difficulty * 128;
+            whitgl_fvec rat_offset = {128 + 64 * rats[i]->anim->frametr.x,
+                y_offset};
             //whitgl_fvec rat_offset = {188, 87};
             whitgl_fvec rat_size = {64, 128};
             whitgl_set_shader_fvec(WHITGL_SHADER_EXTRA_1, 2, rat_offset);

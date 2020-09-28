@@ -7,6 +7,7 @@
 #include "intro.h"
 #include "midi.h"
 #include "music.h"
+#include "ending.h"
 #include "graphics.h"
 
 #include <whitgl/sound.h>
@@ -175,7 +176,7 @@ void game_free_level(map_t *map) {
 
 void set_note_pop_text(char text[SHORT_TEXT_MAX_LEN]) {
     note_pop_text.exists = true;
-    note_pop_text.life = 60.0f / BPM;
+    note_pop_text.life = 60.0f / music_get_cur_bpm();
     strncpy(note_pop_text.text, text, SHORT_TEXT_MAX_LEN);
 }
 
@@ -231,8 +232,9 @@ static void draw_note_overlay() {
     }
 
     int cur_music_note = music_get_cur_note();
+    WHITGL_LOG("%d", cur_music_note);
     float song_time = music_get_song_time();
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float secs_per_note = (60.0f / music_get_cur_bpm() * 4 / NOTES_PER_MEASURE);
     float time_to_next_beat = secs_per_note * (8 - cur_music_note % 8)
         - music_get_time_since_note();
     float frac_to_next_beat = time_to_next_beat / secs_per_note / 8.0f;
@@ -257,7 +259,7 @@ static void draw_overlay(int cur_note) {
     // Draw health bar
     draw_health_bar(cur_note, player);
 
-    draw_notif(note);
+    draw_notif(note, music_get_frac_since_note());
 
     draw_instr(note);
 }
@@ -426,16 +428,27 @@ static int player_update(player_t *p, int note)
     p->look_facing.y = sin(p->look_angle * whitgl_pi / 128.0f);
     p->facing.x = cos(p->angle * whitgl_pi / 128.0f);
     p->facing.y = sin(p->angle * whitgl_pi / 128.0f);
+
+    // Test for player having no health
+    if (p->health == 0) {
+        ending_set_text("Unfortunately, you died due to lack of vitality.");
+        return GAME_STATE_ENDING;
+    }
     
     // Test for portals, doors, etc
     if (MAP_TILE(&map, p->pos.x, p->pos.y) == TILE_TYPE_PORTAL) {
         WHITGL_LOG("next level");
         level++;
+        intro_set_level(level);
         return GAME_STATE_INTRO;
     }
 
     if (p->targeted_rat != -1) {
         midi_set_player(p, &map);
+        rat_t *r = rat_get(p->targeted_rat);
+        int difficulty = r->difficulty;
+        int len = (r->boss ? 512 : 128);
+        midi_set_difficulty(difficulty, len);
         return GAME_STATE_MIDI;
     }
 
@@ -584,6 +597,7 @@ void game_cleanup() {
 
 void game_set_level(int level_in) {
     level = level_in;
+    intro_set_level(level_in);
 }
 
 void game_start() {
@@ -598,12 +612,8 @@ void game_start() {
     game_load_level(levelstr, &map);
 }
 
-void game_stop() {
-    whitgl_loop_set_paused(AMBIENT_MUSIC, true);
-}
-
 int game_update(float dt) {
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
+    float secs_per_note = (60.0f / music_get_cur_bpm() * 4 / NOTES_PER_MEASURE);
     int next_note = music_get_cur_note();
     int song_len = music_get_song_len();
     if (prev_note != next_note) {

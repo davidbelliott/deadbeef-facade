@@ -12,5 +12,6 @@ void intro_frame();
 void intro_pause(bool paused);
 
 void intro_set_text(char *newtext);
+void intro_set_level(int level);
 
 #endif

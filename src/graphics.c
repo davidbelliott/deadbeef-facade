@@ -186,10 +186,8 @@ void notify(int note, const char *str, whitgl_sys_color color) {
     notif_col = color;
 }
 
-void draw_notif(int note) {
+void draw_notif(int note, float frac_since_note) {
     if (note - notif_update_time < 8) {
-        float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-        float frac_since_note = music_get_time_since_note() / secs_per_note;
         int notif_width = FONT_CHAR_W * strlen(notification);
         int top_y = SCREEN_H / 2 + (note - notif_update_time + frac_since_note) * 4;
         whitgl_iaabb notif_iaabb = {{SCREEN_W / 2 - notif_width / 2, top_y},
@@ -274,10 +272,7 @@ void add_explosion(int note, whitgl_ivec screen_pos) {
     explosions[idx].start_note = note;
 }
 
-void draw_explosions(int note) {
-
-    float secs_per_note = (60.0f / BPM * 4 / NOTES_PER_MEASURE);
-    float frac_since_note = music_get_time_since_note() / secs_per_note;
+void draw_explosions(int note, float frac_since_note) {
     for (int idx = 0; idx < MAX_N_EXPLOSIONS; idx++) {
         if (explosions[idx].exists) {
             if (explosions[idx].start_note > note ||

@@ -19,9 +19,9 @@ enum {
 
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
-#define SCREEN_W 640
-#define SCREEN_H 480
-#define PIXEL_DIM 1
+#define SCREEN_W 683
+#define SCREEN_H 384
+#define PIXEL_DIM 2
 #define MOUSE_SENSITIVITY 2.0
 #define MAX_DIST 15
 #define MOVE_SPEED 3.000
@@ -43,8 +43,6 @@ enum {
 #define MEASURES_PER_LOOP 4
 #define TOTAL_NUM_NOTES (NOTES_PER_MEASURE * MEASURES_PER_LOOP)
 #define NUM_LOOPS 16
-//#define BPM 117
-#define BPM 130
 
 #define FONT_CHAR_W 9
 #define FONT_CHAR_H 16
@@ -82,6 +80,7 @@ enum {
     GAME_STATE_INTRO,
     GAME_STATE_MIDI,
     GAME_STATE_PAUSE,
+    GAME_STATE_ENDING,
     GAME_STATE_EXIT,
 };
 
