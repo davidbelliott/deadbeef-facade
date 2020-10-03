@@ -237,7 +237,7 @@ void draw_top_bar(int note, player_t *player) {
     if (player->keys & KEY_B)
         key_str[2] = 'B';
     char path[256];
-    snprintf(path, 256, "[PATH: data/lvl/lvl1] [KEYS: %s] [FPS: %d]", key_str, whitgl_timer_fps());
+    snprintf(path, 256, "[PATH: data/lvl/lvl1] [KEYS: %s] [FPS: %d]", key_str, (int)whitgl_timer_fps());
     draw_window(path, top_iaabb, top_col);
 }
 
