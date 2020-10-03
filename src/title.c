@@ -26,7 +26,9 @@ void title_start() {
 
     double bpm;
     FILE *f = fopen("data/lvl/lvl1/bpm", "r");
-    fscanf(f, "%lf", &bpm);
+    if (!fscanf(f, "%lf", &bpm)) {
+        bpm = 130;
+    }
     fclose(f);
     music_play_from_beginning(CUR_LVL_MUSIC, bpm);
     next_gamestate = GAME_STATE_MENU;

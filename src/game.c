@@ -109,7 +109,8 @@ void game_load_level(char *levelname, map_t *map) {
     char difficulty_path[256];
     snprintf(difficulty_path, 256, "data/lvl/lvl%d/difficulty", level);
     FILE *f = fopen(difficulty_path, "r");
-    fscanf(f, "%d", &level_difficulty);
+    if (!fscanf(f, "%d", &level_difficulty))
+        level_difficulty = 0;
     fclose(f);
 
     unsigned char *data;

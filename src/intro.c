@@ -65,7 +65,8 @@ void intro_start() {
         char bpm_path[256];
         snprintf(bpm_path, 256, "data/lvl/lvl%d/bpm", level);
         f = fopen(bpm_path, "r");
-        fscanf(f, "%lf", &bpm);
+        if (!fscanf(f, "%lf", &bpm))
+            bpm = 130;
         fclose(f);
 
         // Start playing music
