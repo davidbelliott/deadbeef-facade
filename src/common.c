@@ -85,7 +85,6 @@ void draw_window(char *title, whitgl_iaabb iaabb, whitgl_sys_color fill) {
 void draw_str_with_newlines(const char *text, int n_chars, whitgl_ivec pos) {
     char *line = (char*)malloc(n_chars + 1);
     whitgl_sprite font = {0, {0,64}, {FONT_CHAR_W,FONT_CHAR_H}};
-    int x = pos.x;
     int y = pos.y;
     int line_idx = 0;
     for (int i = 0; i < n_chars && text[i] != '\0'; i++) {
@@ -93,7 +92,6 @@ void draw_str_with_newlines(const char *text, int n_chars, whitgl_ivec pos) {
             line[line_idx] = '\0';
             whitgl_ivec text_pos = {pos.x, y};
             whitgl_sys_draw_text(font, line, text_pos);
-            x = pos.x;
             y += FONT_CHAR_H;
             line_idx = 0;
         } else {
@@ -111,7 +109,6 @@ void wrap_text(const char *text, char *wrapped, int wrapped_len, whitgl_iaabb bo
     int x = bounding_box.a.x;
     int y = bounding_box.a.y;
     int max_x = bounding_box.b.x;
-    int max_y = bounding_box.b.y;
     int last_whitespace_idx = -1;
     int wrapped_idx = 0;
     for (int i = 0; i < len; i++) {

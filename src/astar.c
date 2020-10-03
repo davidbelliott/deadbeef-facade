@@ -40,7 +40,6 @@ void astar_insert_sort_f(list_t **head, astar_node_t *node) {
 }
 
 bool astar_in(list_t **head, astar_node_t *node) {
-    bool in = false;
     list_t *q = *head;
     while(q) {
         if(whitgl_ivec_eq(((astar_node_t*)q->data)->pt, node->pt)) {

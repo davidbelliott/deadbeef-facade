@@ -52,7 +52,6 @@ int ending_update(float dt) {
         //whitgl_sound_play(0, 1, 1);
     }
     text_chars = new_text_chars;
-    int cur_note = music_get_cur_note();
     if (waiting_to_exit) {
         return GAME_STATE_MENU;
     } else {
