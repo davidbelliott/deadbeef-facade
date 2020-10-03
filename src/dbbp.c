@@ -262,7 +262,7 @@ int main(int argc, char* argv[]) {
         whitgl_shader tex_model_shader = whitgl_shader_zero;
         tex_model_shader.vertex_src = vertex_model_src;
         tex_model_shader.fragment_src = frag_src;
-        tex_model_shader.num_uniforms = 6;
+        tex_model_shader.num_uniforms = 5;
         tex_model_shader.uniforms[0].name = "tex";
         tex_model_shader.uniforms[0].type = WHITGL_UNIFORM_IMAGE;
         tex_model_shader.uniforms[1].name = "spritesheet_size";
