@@ -84,7 +84,7 @@ int intro_update(float dt) {
     }
     text_chars = new_text_chars;
     int cur_note = music_get_cur_note();
-    if (waiting_to_exit && cur_note % 16 == 0) {
+    if (waiting_to_exit && cur_note % 32 == 0) {
         return GAME_STATE_GAME;
     } else {
         return GAME_STATE_INTRO;

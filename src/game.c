@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int lvl_grace_period = 64;
+int lvl_grace_period = 32;
 
 #define MOVE_NONE       0
 #define MOVE_FORWARD    1
