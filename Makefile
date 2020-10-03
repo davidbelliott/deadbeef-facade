@@ -1,5 +1,5 @@
 #-Wall -O3
-CFLAGS 	=  -Werror -lm -D_GNU_SOURCE -g -pg -I./inc -I./src -Iwhitgl/inc -Iwhitgl/input/TinyMT -Imidi-parser/include
+CFLAGS 	=  -Werror -lm -D_GNU_SOURCE -I./inc -I./src -Iwhitgl/inc -Iwhitgl/input/TinyMT -Imidi-parser/include -O3
 LDFLAGS =  -Wl,-rpath=.,--enable-new-dtags -Lmidi-parser -Lwhitgl/build/lib -Lwhitgl/input/irrklang/bin/linux-gcc-64  -Lwhitgl/input/glfw/build/src -lmidi-parser -l:whitgl.a -lglfw3 -lGLU -lGL -lGLEW -lm -lIrrKlang -lX11 -lXxf86vm -lpthread -lXrandr -lXinerama -lXcursor -lXi -lpng -ldl whitgl/input/TinyMT/tinymt/tinymt64.o -lz -lstdc++
 
 SRC = $(wildcard src/*.c)

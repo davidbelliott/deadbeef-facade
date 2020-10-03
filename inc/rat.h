@@ -7,24 +7,25 @@
 
 typedef struct rat_t {
     unsigned int id;
-    int notes_between_update;
-    int type;
     int difficulty;
+    int notes_between_update;
+    bool move;
+    bool use_astar;
     whitgl_ivec pos;
     whitgl_ivec look_pos;
     anim_obj *anim;
     list_t *path;
-    int health;
+    whitgl_ivec move_dir;
     bool dead;
     bool boss;
+    int type;
 } rat_t;
 
 typedef struct player_t player_t;
 
 rat_t* rat_get(int id);
-rat_t* rat_create(whitgl_ivec pos, map_t *map);
+rat_t* rat_create(whitgl_ivec pos, map_t *map, int type, int difficulty);
 void rat_kill(int rat_id);
-void rat_deal_damage(rat_t *rat, int dmg);
 int get_closest_targeted_rat(whitgl_ivec player_pos, whitgl_ivec player_facing, map_t *map);
 int get_closest_visible_rat(whitgl_ivec player_pos, map_t *map);
 void rats_prune(player_t *p, map_t *m);

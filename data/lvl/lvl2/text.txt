@@ -1,0 +1,1 @@
+[APE MAN]: Use the space bar to defeat fiends. You must hit the notes in their MIDI sequence to defeat them.

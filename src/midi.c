@@ -26,6 +26,7 @@
 #include "graphics.h"
 #include "music.h"
 #include "rat.h"
+#include "ending.h"
 
 #define MAX_MIDI_LEN 1024     // number of notes in this clip
 
@@ -151,7 +152,7 @@ void midi_start() {
             half_note_chance = 2;
             break;
     }
-    for (int i = 1; i < MAX_MIDI_LEN / main_interval; i++) {
+    for (int i = 1; i < length / main_interval; i++) {
         notes[i * main_interval].exists = (rand() % half_note_chance == 0 || i % 2 == 0);
         notes[i * main_interval].chan = rand() % 4;
         notes[i * main_interval].beat = i * main_interval;
@@ -251,6 +252,12 @@ int midi_update(float dt) {
         prev_music_beat = next_music_beat;
     }
     rat_update(player->targeted_rat);
+
+    // Test for player having no health
+    if (player->health == 0) {
+        ending_set_text("Unfortunately, in the midst of a MIDI sequence you died due to lack of vitality.");
+        return GAME_STATE_ENDING;
+    }
     return GAME_STATE_MIDI;
 }
 
@@ -262,15 +269,15 @@ static whitgl_ivec get_note_pos(int i) {
     int dx = 0;
     int dy = 0;
     if (chan == 0) {
-        center_target_pos.y -= NOTE_W;
+        center_target_pos.y -= NOTE_W - 1;
         dy = 1;
     } else if (chan == 1) {
-        center_target_pos.x -= NOTE_W;
+        center_target_pos.x -= NOTE_W - 1;
         dx = 1;
     } else if (chan == 2) {
         dy = -1;
     } else if (chan == 3) {
-        center_target_pos.x += NOTE_W;
+        center_target_pos.x += NOTE_W - 1;
         dx = -1;
     }
     if (i <= note) {
@@ -318,24 +325,26 @@ static void draw_note_bg() {
 static void draw_note_overlay() {
     whitgl_ivec crosshairs_pos = {SCREEN_W / 2, SCREEN_H / 2};
     whitgl_sys_color border = {255, 255, 255, 255};
-    whitgl_sys_color bg = {0, 0, 255, 255};
+    whitgl_sys_color bg = {0, 0, 0, 255};
     whitgl_sys_color black = {0, 0, 0, 255};
 
     whitgl_iaabb bg_box = {{crosshairs_pos.x - 30, crosshairs_pos.y - 30}, {crosshairs_pos.x + 30, crosshairs_pos.y + 30}};
-    whitgl_sys_draw_iaabb(bg_box, black);
+    //whitgl_sys_draw_iaabb(bg_box, black);
 
     whitgl_iaabb box = {{crosshairs_pos.x - NOTE_W / 2, crosshairs_pos.y - NOTE_W / 2}, {crosshairs_pos.x + NOTE_W / 2, crosshairs_pos.y + NOTE_W / 2}};
-    box.a.y -= NOTE_W;
-    box.b.y -= NOTE_W;
+    box.a.y -= NOTE_W - 1;
+    box.b.y -= NOTE_W - 1;
     whitgl_sys_draw_iaabb(box, bg);
-    box.a.y += NOTE_W;
-    box.b.y += NOTE_W;
-    box.a.x -= NOTE_W;
-    box.b.x -= NOTE_W;
+    whitgl_sys_draw_hollow_iaabb(box, 1, border);
+    box.a.y += NOTE_W - 1;
+    box.b.y += NOTE_W - 1;
+    box.a.x -= NOTE_W - 1;
+    box.b.x -= NOTE_W - 1;
     for (int i = 0; i < 3; i++) {
         whitgl_sys_draw_iaabb(box, bg);
-        box.a.x += NOTE_W;
-        box.b.x += NOTE_W;
+        whitgl_sys_draw_hollow_iaabb(box, 1, border);
+        box.a.x += NOTE_W - 1;
+        box.b.x += NOTE_W - 1;
     }
 
     float frac_since_note = music_get_frac_since_note();
@@ -343,14 +352,18 @@ static void draw_note_overlay() {
     for (int i = MAX(note - BAD_N_NOTES, 0); i < MIN(MAX_MIDI_LEN, note + LOOKAHEAD_TIME); i++) {
         if (notes[i].exists) {
             whitgl_ivec center_pos = get_note_pos(i);
-            int x = center_pos.x - NOTE_W / 2;
-            int y = center_pos.y - NOTE_W / 2;
+            int half_w = NOTE_W / 2;// * (1.0 + (i - note) / 16.0f);
+            whitgl_sys_color note_color = {128, 0, 128, 255};
             if (i <= note) {
+                int x = center_pos.x - NOTE_W / 2;
+                int y = center_pos.y - NOTE_W / 2;
                 whitgl_iaabb iaabb = {{x, y}, {x + NOTE_W, y + NOTE_W}};
                 whitgl_sys_draw_iaabb(iaabb, border);
             } else {
-                whitgl_iaabb iaabb = {{x, y}, {x + NOTE_W, y + NOTE_W}};
-                whitgl_sys_draw_iaabb(iaabb, black);
+                int x = center_pos.x - half_w;
+                int y = center_pos.y - half_w;
+                whitgl_iaabb iaabb = {{x, y}, {x + 2 * half_w, y + 2 * half_w}};
+                whitgl_sys_draw_iaabb(iaabb, note_color);
                 whitgl_sys_draw_hollow_iaabb(iaabb, 1, border);
             }
         }

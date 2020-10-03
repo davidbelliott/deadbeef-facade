@@ -105,6 +105,13 @@ static void player_create(whitgl_ivec pos, unsigned int angle) {
 }
 
 void game_load_level(char *levelname, map_t *map) {
+    int level_difficulty;
+    char difficulty_path[256];
+    snprintf(difficulty_path, 256, "data/lvl/lvl%d/difficulty", level);
+    FILE *f = fopen(difficulty_path, "r");
+    fscanf(f, "%d", &level_difficulty);
+    fclose(f);
+
     unsigned char *data;
     whitgl_int w = 0, h = 0;
     bool ret = whitgl_sys_load_png(levelname, &w, &h, &data);
@@ -151,7 +158,11 @@ void game_load_level(char *levelname, map_t *map) {
                 player_create(pos, 0);
                 break;
             case ENTITY_TYPE_RAT:
-                rat_create(pos, map);
+            case ENTITY_TYPE_BLOCKER:
+            case ENTITY_TYPE_WALKER:
+            case ENTITY_TYPE_RUNNER:
+            case ENTITY_TYPE_BOSS:
+                rat_create(pos, map, entity, level_difficulty);
                 break;
             case ENTITY_TYPE_RKEY:
                 key_create(pos, KEY_R, map);
@@ -447,7 +458,7 @@ static int player_update(player_t *p, int note)
         midi_set_player(p, &map);
         rat_t *r = rat_get(p->targeted_rat);
         int difficulty = r->difficulty;
-        int len = (r->boss ? 512 : 128);
+        int len = (r->boss ? 512 : 256);
         midi_set_difficulty(difficulty, len);
         return GAME_STATE_MIDI;
     }

@@ -250,7 +250,7 @@ int main(int argc, char* argv[]) {
         setup.resolution_mode = RESOLUTION_EXACT;
         setup.fullscreen = true;
         setup.name = "main";
-        setup.resizable = true;
+        setup.resizable = false;
         if (!whitgl_sys_init(&setup))
             return 1;
 
@@ -436,6 +436,10 @@ int main(int argc, char* argv[]) {
                 } else if (game_state == GAME_STATE_MIDI) {
                     if (next_state == GAME_STATE_GAME) {
                         game_from_midi();
+                    } else if (next_state == GAME_STATE_ENDING) {
+                        game_cleanup();
+                        game_set_level(1);
+                        ending_start();
                     }
                 } else if (game_state == GAME_STATE_PAUSE) {
                     if (next_state == GAME_STATE_MENU) {

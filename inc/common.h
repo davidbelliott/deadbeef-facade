@@ -21,6 +21,8 @@ enum {
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 #define SCREEN_W 683
 #define SCREEN_H 384
+//#define SCREEN_W 640
+//#define SCREEN_H 480
 #define PIXEL_DIM 2
 #define MOUSE_SENSITIVITY 2.0
 #define MAX_DIST 15
@@ -36,7 +38,7 @@ enum {
 #define MAX_N_PHYS_PASSES 8
 #define MAX_N_PATHFINDING_STEPS 256
 #define MAX_N_ANIM_STATES 8
-#define MAX_N_ANIM_OBJS 1024 * 128
+#define MAX_N_ANIM_OBJS 128
 #define CROSSHAIR_DIAM 9
 #define SQRT2 1.41421356237
 #define NOTES_PER_MEASURE 32
@@ -94,13 +96,20 @@ enum {
 #define TILE_TYPE_BDOOR     7
 #define N_TILE_TYPES        8
 
-#define ENTITY_TYPE_NONE    0
-#define ENTITY_TYPE_PLAYER  1
-#define ENTITY_TYPE_RAT     2
-#define ENTITY_TYPE_RKEY    3
-#define ENTITY_TYPE_GKEY    4
-#define ENTITY_TYPE_BKEY    5
-#define N_ENTITY_TYPES      6
+enum {
+    ENTITY_TYPE_NONE,
+    ENTITY_TYPE_PLAYER,
+    ENTITY_TYPE_RKEY,
+    ENTITY_TYPE_GKEY,
+    ENTITY_TYPE_BKEY,
+    ENTITY_TYPE_RAT,
+    ENTITY_TYPE_BOSS,
+    ENTITY_TYPE_BLOCKER,
+    ENTITY_TYPE_WALKER,
+    ENTITY_TYPE_RUNNER,
+    ENTITY_TYPE_CHASER,
+    N_ENTITY_TYPES
+};
 
 extern int tile_lvl_rgb[N_TILE_TYPES][3];
 extern int entity_lvl_rgb[N_ENTITY_TYPES][3];

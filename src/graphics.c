@@ -7,6 +7,7 @@
 
 #include <whitgl/sys.h>
 #include <whitgl/timer.h>
+#include <whitgl/logging.h>
 
 #include <stdlib.h>
 #include <math.h>
@@ -21,7 +22,7 @@ char notification[64];
 whitgl_sys_color notif_col;
 int notif_update_time;
 
-char instruction[1024] = "";
+char instruction[1024];
 int instr_update_time;
 
 typedef struct explosion_t {
@@ -173,15 +174,15 @@ void draw_entities(whitgl_fvec pov_pos, float angle) {
 }
 
 void instruct(int note, const char *str) {
-    strncpy(instruction, str, 1024);
-    instruction[1024] = 0;
+    strncpy(instruction, str, 1023);
+    instruction[1023] = 0;
     instr_update_time = note;
 }
 
 
 void notify(int note, const char *str, whitgl_sys_color color) {
-    strncpy(notification, str, 64);
-    notification[64] = 0;
+    strncpy(notification, str, 63);
+    notification[63] = 0;
     notif_update_time = note;
     notif_col = color;
 }

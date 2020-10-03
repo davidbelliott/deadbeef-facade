@@ -37,11 +37,16 @@ int tile_lvl_rgb[][3] = {
 
 int entity_lvl_rgb[N_ENTITY_TYPES][3] = {
     {0, 0, 0},          // ENTITY_TYPE_NONE
-    {255, 255, 127},    // ENTITY_TYPE_PLAYER
-    {255, 255, 0},      // ENTITY_TYPE_RAT
+    {255, 255, 255},    // ENTITY_TYPE_PLAYER
     {255, 0, 127},      // ENTITY_TYPE_RKEY
     {0, 127, 0},        // ENTITY_TYPE_GKEY
-    {127, 0, 255}       // ENTITY_TYPE_BKEY
+    {127, 0, 255},      // ENTITY_TYPE_BKEY
+    {255, 255, 0},      // ENTITY_TYPE_RAT
+    {255, 127, 0},      // ENTITY_TYPE_BOSS
+    {255, 127, 127},    // ENTITY_TYPE_BLOCKER
+    {127, 127, 0},      // ENTITY_TYPE_WALKER
+    {127, 255, 0},      // ENTITY_TYPE_RUNNER
+    {127, 0, 255},      // ENTITY_TYPE_CHASER
 };
 
 int tile_tex_offset[N_TILE_TYPES][2] = {
@@ -60,7 +65,10 @@ bool tile_walkable[N_TILE_TYPES] = {
     false,
     false,
     false,
-    true
+    true,
+    false,
+    false,
+    false
 };
 
 void draw_text(char *text, whitgl_ivec pos) {
