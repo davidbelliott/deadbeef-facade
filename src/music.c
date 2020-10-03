@@ -9,11 +9,10 @@ whitgl_float song_time = 0.0f;
 
 int actual_song_millis = 0;
 int prev_actual_song_millis = 0;
-int cur_snd = -1;
+int cur_snd = 0;
 double cur_bpm = -1.0;
 
 void music_init() {
-    whitgl_loop_add(AMBIENT_MUSIC, "data/snd/ambient.ogg");
 }
 
 void music_set_paused(int snd, bool paused_in) {

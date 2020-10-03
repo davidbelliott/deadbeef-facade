@@ -36,7 +36,6 @@ void title_start() {
 }
 
 void title_stop() {
-    music_set_paused(AMBIENT_MUSIC, true);
 }
 
 int title_update(float dt) {
@@ -67,8 +66,8 @@ void title_input() {
 void title_frame() {
     whitgl_sys_draw_init(0);
     whitgl_ivec screen_size = whitgl_sys_get_screen_size();
-    int w = screen_size.x / PIXEL_DIM;
-    int h = screen_size.y / PIXEL_DIM;
+    int w = SCREEN_W;//screen_size.x / PIXEL_DIM;
+    int h = SCREEN_H;//screen_size.y / PIXEL_DIM;
     whitgl_sys_enable_depth(false);
     
     whitgl_sys_color col = {0, 0, 128, 255};

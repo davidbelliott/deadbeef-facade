@@ -1,6 +1,5 @@
 #include <whitgl/sound.h>
 
-#define AMBIENT_MUSIC -1
 #define CUR_LVL_MUSIC 0
 
 void music_init();

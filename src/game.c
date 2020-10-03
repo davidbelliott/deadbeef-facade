@@ -468,7 +468,6 @@ static int player_update(player_t *p, int note)
 }
 
 void game_pause(bool paused) {
-    music_set_paused(AMBIENT_MUSIC, paused);
 }
 
 void game_input()

@@ -23,7 +23,7 @@ enum {
 #define SCREEN_H 384
 //#define SCREEN_W 640
 //#define SCREEN_H 480
-#define PIXEL_DIM 2
+#define PIXEL_DIM 1
 #define MOUSE_SENSITIVITY 2.0
 #define MAX_DIST 15
 #define MOVE_SPEED 3.000
