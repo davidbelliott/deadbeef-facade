@@ -248,7 +248,7 @@ int main(int argc, char* argv[]) {
         setup.size.y = SCREEN_H;
         setup.pixel_size = PIXEL_DIM;
         setup.resolution_mode = RESOLUTION_EXACT;
-        setup.fullscreen = true;
+        setup.fullscreen = false;
         setup.name = "main";
         setup.resizable = false;
         if (!whitgl_sys_init(&setup))
