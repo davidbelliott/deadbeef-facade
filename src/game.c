@@ -244,7 +244,7 @@ static void draw_note_overlay() {
     }
 
     int cur_music_note = music_get_cur_note();
-    WHITGL_LOG("%d", cur_music_note);
+    //WHITGL_LOG("%d", cur_music_note);
     float song_time = music_get_song_time();
     float secs_per_note = (60.0f / music_get_cur_bpm() * 4 / NOTES_PER_MEASURE);
     float time_to_next_beat = secs_per_note * (8 - cur_music_note % 8)
@@ -417,23 +417,38 @@ static void player_on_note(player_t *p, int note) {
     }
 }
 
-static int player_update(player_t *p, int note)
+static int player_update(player_t *p, int note, float dt)
 {
+    WHITGL_LOG("%d", p->angle);
+    float angle_step = dt * 400;
     if (p->angle != p->look_angle && p->last_rotate_dir == 1) {
-        p->look_angle = (p->look_angle + 8) % 256;
+        p->look_angle = (int)(p->look_angle + angle_step);
+        if (p->look_angle > p->angle) {
+            if (p->angle != 0)
+                p->look_angle = p->angle;
+            else if (p->look_angle > 256)
+                p->look_angle = 0;
+        }
     } else if (p->angle != p->look_angle) {
-        p->look_angle = (p->look_angle - 8) % 256;
+        p->look_angle = (int)(p->look_angle - angle_step);
+        if (p->look_angle < p->angle) {
+            if (p->angle != 192)    // 270 degrees
+                p->look_angle = p->angle;
+            else if (p->look_angle < -64)
+                p->look_angle = 192;
+        }
     }
 
+    float pos_step = dt * 1600;
     if (p->pos.x * 256 > p->look_pos.x) {
-        p->look_pos.x += 32;
+        p->look_pos.x = MIN(p->pos.x * 256, p->look_pos.x + pos_step);
     } else if (p->pos.x * 256 < p->look_pos.x) {
-        p->look_pos.x -= 32;
+        p->look_pos.x = MAX(p->pos.x * 256, p->look_pos.x - pos_step);
     }
     if (p->pos.y * 256 > p->look_pos.y) {
-        p->look_pos.y += 32;
+        p->look_pos.y = MIN(p->pos.y * 256, p->look_pos.y + pos_step);
     } else if (p->pos.y * 256 < p->look_pos.y) {
-        p->look_pos.y -= 32;
+        p->look_pos.y = MAX(p->pos.y * 256, p->look_pos.y - pos_step);
     }
 
     p->look_facing.x = cos(p->look_angle * whitgl_pi / 128.0f);
@@ -506,7 +521,9 @@ void game_input()
         } else if (p->move == MOVE_BACKWARD) {
             newpos = whitgl_ivec_sub(p->pos, p->facing);
         } else if (p->move == MOVE_TURN_LEFT) {
-            p->angle = (p->angle - 64) % 256;
+            p->angle = p->angle - 64;
+            if (p->angle < 0)
+                p->angle += 256;
             p->last_rotate_dir = -1;
         } else if (p->move == MOVE_TURN_RIGHT) {
             p->angle = (p->angle + 64) % 256;
@@ -641,7 +658,7 @@ int game_update(float dt) {
         prev_note = next_note;
     }
     
-    int next_state = player_update(player, note);
+    int next_state = player_update(player, note, dt);
     rats_update(player, dt, note, true, &map);
     rats_prune(player, &map);
 

@@ -243,10 +243,9 @@ int main(int argc, char* argv[]) {
 
         WHITGL_LOG("Starting main.");
         whitgl_sys_setup setup = whitgl_sys_setup_zero;
-        setup.cursor = CURSOR_DISABLE;
         setup.size.x = SCREEN_W;
         setup.size.y = SCREEN_H;
-        setup.pixel_size = PIXEL_DIM;
+        setup.pixel_size = 1;
         setup.resolution_mode = RESOLUTION_EXACT;
         setup.fullscreen = false;
         setup.name = "main";
