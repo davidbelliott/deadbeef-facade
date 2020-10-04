@@ -57,9 +57,9 @@ void intro_start() {
 
     if (level != 1) {
         // Load music
-        char music_path[256];
+        /*char music_path[256];
         snprintf(music_path, 256, "data/lvl/lvl%d/music.ogg", level);
-        whitgl_loop_add(CUR_LVL_MUSIC, music_path);
+        whitgl_loop_add(CUR_LVL_MUSIC, music_path);*/
 
         double bpm;
         char bpm_path[256];
@@ -70,7 +70,7 @@ void intro_start() {
         fclose(f);
 
         // Start playing music
-        music_play_from_beginning(CUR_LVL_MUSIC, bpm);
+        //music_play_from_beginning(CUR_LVL_MUSIC, bpm);
     }
 }
 

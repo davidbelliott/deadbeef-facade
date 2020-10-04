@@ -419,7 +419,7 @@ int main(int argc, char* argv[]) {
                     if (next_state == GAME_STATE_MIDI) {
                         midi_start();
                     } else if (next_state == GAME_STATE_INTRO) {
-                        music_set_paused(CUR_LVL_MUSIC, true);
+                        //music_set_paused(CUR_LVL_MUSIC, true);
                         game_cleanup();
                         intro_start();
                     } else if (next_state == GAME_STATE_MENU) {

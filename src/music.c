@@ -6,6 +6,7 @@
 #include "common.h"
 
 whitgl_float song_time = 0.0f;
+whitgl_float offset_time = 0.23f;
 
 int actual_song_millis = 0;
 int prev_actual_song_millis = 0;
@@ -73,13 +74,13 @@ int music_get_song_len() {
 // div=1 means 32nd notes, 2 means 16th notes...
 int music_get_cur_note() {
     float secs_per_note = (60.0f / cur_bpm * 4 / NOTES_PER_MEASURE);
-    int cur_note = (int)(song_time / secs_per_note);
+    int cur_note = (int)((song_time - offset_time)/ secs_per_note);
     return cur_note;
 }
 
 float music_get_time_since_note() {
     float secs_per_note = (60.0f / cur_bpm * 4 / NOTES_PER_MEASURE);
-    return _fmod(song_time, secs_per_note);
+    return _fmod(song_time - offset_time, secs_per_note);
 }
 
 float music_get_frac_since_note() {

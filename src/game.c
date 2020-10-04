@@ -363,7 +363,7 @@ static void frame(player_t *p, int cur_note)
     // draw move overlay if needed
     if (player->move_time > 0) {
         int elapsed = note - player->move_time;
-        int color_amt = (elapsed < 4 ? (4 - elapsed) * 64 : 0);
+        int color_amt = (elapsed < 4 ? (4 - elapsed) * 32 : 0);
         whitgl_sys_color c = {0, 0, 0, 0};
         switch (p->move_goodness) {
             case 2:
