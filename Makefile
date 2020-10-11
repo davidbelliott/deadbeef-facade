@@ -27,4 +27,4 @@ $(MODEL_WMD): $(MODEL_OBJ)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJ) $(PROGRAM) $(MODEL_WMD)
+	rm -f $(OBJ) $(PROGRAM) $(MODEL_WMD) $(PNG)
