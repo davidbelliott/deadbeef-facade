@@ -379,6 +379,7 @@ int main(int argc, char* argv[]) {
                         break;
                 }
             }
+            whitgl_timer_sleep(1.0f / 60.0f - dt);
             // Input
             input(&paused, &running, game_state);
             // Draw
