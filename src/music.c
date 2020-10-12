@@ -6,12 +6,13 @@
 #include "common.h"
 
 whitgl_float song_time = 0.0f;
-whitgl_float offset_time = 0.23f;
+whitgl_float offset_time = 0.05f;//0.23f;
 
 int actual_song_millis = 0;
 int prev_actual_song_millis = 0;
 int cur_snd = 0;
 double cur_bpm = -1.0;
+double cur_vol = 0.0;
 
 void music_init() {
 }
@@ -27,7 +28,8 @@ void music_play_from_beginning(int snd, double bpm) {
     actual_song_millis = 0;
     prev_actual_song_millis = 0;
     whitgl_loop_seek(snd, 0.0f);
-    //whitgl_loop_volume(cur_snd, 0.0f);
+    cur_vol = 0.0;
+    whitgl_loop_volume(cur_snd, cur_vol);
     whitgl_loop_set_paused(snd, false);
 }
 
@@ -57,7 +59,8 @@ void music_update(float dt) {
     }
 
     // Update volume
-    //whitgl_loop_volume(cur_snd, whitgl_fmin(song_time / 5.0f, 1.0f));
+    cur_vol = whitgl_fmin(cur_vol + dt / 5.0, 1.0);
+    whitgl_loop_volume(cur_snd, cur_vol);
 }
 
 float music_get_song_time() {

@@ -32,7 +32,9 @@ int tile_lvl_rgb[][3] = {
     {0, 255, 255},  // TILE_TYPE_PORTAL
     {255, 0, 0},    // TILE_TYPE_RDOOR
     {0, 255, 0},    // TILE_TYPE_GDOOR
-    {0, 0, 255}     // TILE_TYPE_BDOOR
+    {0, 0, 255},    // TILE_TYPE_BDOOR
+    {0, 127, 127},  // TILE_TYPE_RFINE
+    {127, 127, 255},  // TILE_TYPE_BFINE
 };
 
 int entity_lvl_rgb[N_ENTITY_TYPES][3] = {
@@ -57,7 +59,9 @@ int tile_tex_offset[N_TILE_TYPES][2] = {
     {384, 0},       // TILE_TYPE_PORTAL
     {384, 0},       // TILE_TYPE_RDOOR
     {448, 0},       // TILE_TYPE_GDOOR
-    {512, 0}        // TILE_TYPE_BDOOR
+    {512, 0},       // TILE_TYPE_BDOOR
+    {256, 64},      // TILE_TYPE_RFINE
+    {320, 64},      // TILE_TYPE_BFINE
 };
 
 bool tile_walkable[N_TILE_TYPES] = {
@@ -66,6 +70,8 @@ bool tile_walkable[N_TILE_TYPES] = {
     false,
     false,
     true,
+    false,
+    false,
     false,
     false,
     false

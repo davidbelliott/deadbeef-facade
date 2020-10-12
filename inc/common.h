@@ -94,7 +94,9 @@ enum {
 #define TILE_TYPE_RDOOR     5
 #define TILE_TYPE_GDOOR     6
 #define TILE_TYPE_BDOOR     7
-#define N_TILE_TYPES        8
+#define TILE_TYPE_RFINE     8
+#define TILE_TYPE_BFINE     9
+#define N_TILE_TYPES        10
 
 enum {
     ENTITY_TYPE_NONE,

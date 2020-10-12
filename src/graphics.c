@@ -115,8 +115,18 @@ void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitgl_fmat 
         bool draw = false;
         for (;;) {
             if (!tile_walkable[MAP_TILE(map, x, y)]) {
-                draw = true;
+                if (!drawn[y * map->h + x]) {
+                    whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
+                    draw_wall(MAP_TILE(map, x, y), pos, view, persp);
+                    n_drawn++;
+                    drawn[y * map->h + x] = true;
+                }
                 break;
+            } else if (!drawn[y * map->h + x]) {
+                whitgl_ivec pos = {x, y};
+                draw_floor(pos, view, persp, false);
+                n_drawn++;
+                drawn[y * map->h + x] = true;
             }
 
             if (max_x < max_y) {
@@ -130,12 +140,6 @@ void raycast(whitgl_fvec *position, double angle, whitgl_fmat view, whitgl_fmat 
                     break;
                 }
             }
-        }
-        if (!drawn[y * map->h + x] && draw) {
-            whitgl_fvec3 pos = {x + 0.5f, y + 0.5f, 0.5f};
-            draw_wall(MAP_TILE(map, x, y), pos, view, persp);
-            n_drawn++;
-            drawn[y * map->h + x] = true;
         }
     }
     free(drawn);
